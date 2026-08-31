@@ -1,0 +1,89 @@
+name: Release
+
+# Publishes a GitHub Release with a built APK whenever a version tag is pushed:
+#
+#   git tag v1.0.1 && git push origin v1.0.1
+#
+# The tag IS the version source of truth: versionName/versionCode are derived
+# from it (see app/build.gradle.kts and app/src/.../update/VersionUtils.kt).
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # required to create the Release and upload the APK asset
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate version tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "Tag: $TAG"
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Tag '$TAG' is not in the expected vMAJOR.MINOR.PATCH format"
+            exit 1
+          }
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle (with caching)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Configure release signing
+        # If the repository secrets RELEASE_KEYSTORE_BASE64, RELEASE_KEYSTORE_PASSWORD,
+        # RELEASE_KEY_ALIAS and RELEASE_KEY_PASSWORD are set, the APK is signed with
+        # the real release key. Otherwise it is signed with the FIXED debug keystore
+        # committed at the repo root (debug.keystore, password "android"). That
+        # committed keystore keeps the signing identity STABLE across runs and
+        # machines, which Android requires to accept in-place updates.
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release.keystore
+            echo "RELEASE_STORE_FILE=$GITHUB_WORKSPACE/release.keystore" >> "$GITHUB_ENV"
+            echo "RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "Signing with the provided release keystore."
+          else
+            echo "RELEASE_STORE_FILE=$GITHUB_WORKSPACE/debug.keystore" >> "$GITHUB_ENV"
+            echo "RELEASE_STORE_PASSWORD=android" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_ALIAS=androiddebugkey" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_PASSWORD=android" >> "$GITHUB_ENV"
+            echo "Signing with the committed fixed debug keystore."
+          fi
+
+      - name: Run unit tests and build release APK
+        env:
+          # Injected into the existing githubToken() mechanism (env var, read first),
+          # so the RELEASE build's GITHUB_TOKEN is populated from the repo secret.
+          # Never hard-coded; GitHub masks the secret value in logs.
+          GITHUB_TOKEN: ${{ secrets.ANDROID_PRIVATE_PAT }}
+        run: |
+          echo "::add-mask::${{ secrets.ANDROID_PRIVATE_PAT }}"
+          ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleRelease "-PversionTag=${{ github.ref_name }}"
+
+      - name: Rename APK with version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp app/build/outputs/apk/release/app-release.apk "riy-v${VERSION}.apk"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          files: riy-v*.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true

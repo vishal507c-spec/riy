@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- APK is downloaded into app-private storage: getFilesDir()/apk/ -->
+    <files-path name="update_apk" path="apk/" />
+</paths>
