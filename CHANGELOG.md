@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.1 - 2026-09-01
+- Strict NSFW tier on Google Images result pages: the "highly suggestive but non-explicit" band (0.35-0.60 classifier score) that Google SafeSearch leaves visible ("hot photo" / "sexy photo" results) is now blocked inside the app's protected browsing
+- Normal threshold (0.60) everywhere else — fashion/celebrity/beach photography keeps working without false positives
+- Verified on-device: hot photo (2), sexy photo (1), hot girl (4), sexy girl (2), nude (2) images blocked live; fashion dress (0) — no false positives; Chrome limitation unchanged (external browsers rely on SafeSearch + DNS layers only)
+
+
 ## v1.3.0 - 2026-09-01
 - On-device NSFW image classifier (Yahoo OpenNSFW TFLite, bundled) — images rendered inside the app's WebView are classified at pixel level; explicit imagery is blocked even when it comes from non-adult hosts (e.g. SafeSearch-filtered "hot girl" Google Images results)
 - Threshold tuned high (0.60) so swimwear/celebrity/fashion photography stays allowed
