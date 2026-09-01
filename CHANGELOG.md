@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.0 - 2026-09-01
+- Adult search-keyword policy layer: search-engine URLs (Google, Bing, DuckDuckGo, Yandex, Yahoo, Ecosia, Startpage, Brave, Qwant, Mojeek) are inspected in the app's protected browsing and adult queries are BLOCKED before the results page is ever fetched — a real request-level block with an "Adult Search Blocked" page
+- 45+ explicit adult keywords as whole-word tokens (porn, xxx, sex, nude, naked, hentai, rule34, nsfw, erotic, ... ) — lookalikes (Essex, sexton, dickens, analysis) never match
+- Context-aware combo rules: hot/sexy/adult + girl/photo/pics/images/woman/women/content block together ("hot photo" blocked; "hot weather", "hot coffee", "adult education", "girl education", "fashion photo" allowed)
+- Bypass hardening: URL-encoding (%20, double-encoded %2520), '+' separators, any letter case, extra separators (hot...girl) all normalized and caught
+- Unit tests for every requirement example; on-device verified: Google 'hot photo' and Bing 'sexy photo' show "Adult Search Blocked", 'adult education' loads normally
+- Honest limitation unchanged: queries typed in external browsers (Chrome) are inside TLS and invisible to any non-MITM app — those searches rely on enforced SafeSearch + DNS layers only
+
+
 ## v1.3.1 - 2026-09-01
 - Strict NSFW tier on Google Images result pages: the "highly suggestive but non-explicit" band (0.35-0.60 classifier score) that Google SafeSearch leaves visible ("hot photo" / "sexy photo" results) is now blocked inside the app's protected browsing
 - Normal threshold (0.60) everywhere else — fashion/celebrity/beach photography keeps working without false positives
