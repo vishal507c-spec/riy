@@ -40,6 +40,7 @@
     <!-- Blocked screen -->
     <string name="blocked_overlay_icon">✕</string>
     <string name="blocked_overlay_title">Content Blocked</string>
+    <string name="adult_search_blocked_title">Adult Search Blocked</string>
     <string name="blocked_overlay_message">This site may contain adult content and is blocked by Riy Protection. If you believe this is a mistake, close this page.</string>
     <string name="blocked_overlay_close">Close</string>
 

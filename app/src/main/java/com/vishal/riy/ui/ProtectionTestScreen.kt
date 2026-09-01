@@ -11,6 +11,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.vishal.riy.blocker.ImageClassifier
+import com.vishal.riy.blocker.SearchKeywordPolicy
 import com.vishal.riy.blocker.WebContentFilter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -53,6 +54,9 @@ import com.vishal.riy.blocker.BlockerState
 import com.vishal.riy.blocker.Blocklist
 
 private val TEST_SITES = listOf(
+    "https://www.google.com/search?q=hot+photo" to "Adult search block check: 'hot photo' (Google)",
+    "https://www.bing.com/search?q=sexy+photo" to "Adult search block check: 'sexy photo' (Bing)",
+    "https://www.google.com/search?q=adult+education" to "Allow check: 'adult education' (Google)",
     "https://www.google.com/search?q=hot+photo&tbm=isch" to "Google Images 'hot photo' (classifier check)",
     "https://www.google.com/search?q=sexy+photo&tbm=isch" to "Google Images 'sexy photo' (classifier check)",
     "https://www.google.com/search?q=hot+girl&tbm=isch" to "Google Images 'hot girl' (classifier check)",
@@ -192,6 +196,14 @@ private class TestWebViewClient(
         val url = request.url
         if (request.isForMainFrame) {
             strictImageSearchPage = isImageSearchPage(url)
+            // Adult search-keyword layer: block the RESULTS REQUEST itself
+            // (the network fetch never happens) before any other check.
+            if (SearchKeywordPolicy.evaluate(url.toString()) ==
+                SearchKeywordPolicy.Decision.BLOCK_ADULT_QUERY
+            ) {
+                onResult(TestResult.Blocked(url.toString(), "adult search query blocked"))
+                return adultSearchBlockedResponse()
+            }
             return null
         }
         val decision = WebContentFilter.decide(url.host, url.toString(), filterBlocklist)
@@ -214,6 +226,12 @@ private class TestWebViewClient(
 
     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
         val url = request?.url ?: return false
+        if (SearchKeywordPolicy.evaluate(url.toString()) ==
+            SearchKeywordPolicy.Decision.BLOCK_ADULT_QUERY
+        ) {
+            onResult(TestResult.Blocked(url.toString(), "adult search query blocked"))
+            return true
+        }
         val decision = WebContentFilter.decide(url.host, url.toString(), filterBlocklist)
         if (decision != WebContentFilter.Decision.ALLOW) {
             onResult(TestResult.Blocked(url.toString(), "blocked by Riy in-app filter"))
@@ -277,6 +295,20 @@ private class TestWebViewClient(
         } else {
             ""
         }
+        return WebResourceResponse(
+            "text/html", "utf-8", 403, "Blocked by Riy Protection",
+            mapOf("Cache-Control" to "no-store"),
+            body.byteInputStream(),
+        )
+    }
+
+    /** "Adult Search Blocked" page served instead of the search results. */
+    private fun adultSearchBlockedResponse(): WebResourceResponse {
+        val body = "<html><body style='background:#1b1b1b;color:#fff;font-family:sans-serif;" +
+            "display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%'>" +
+            "<h2>Adult Search Blocked</h2>" +
+            "<p style='color:#aaa'>This search query was blocked by Riy Protection.</p>" +
+            "</body></html>"
         return WebResourceResponse(
             "text/html", "utf-8", 403, "Blocked by Riy Protection",
             mapOf("Cache-Control" to "no-store"),
@@ -456,7 +488,14 @@ private fun TestRunView(
         }
 
         if (result is TestResult.Blocked) {
-            BlockedOverlay(onBack = onBackToPicker)
+            BlockedOverlay(
+                onBack = onBackToPicker,
+                title = if (result.detail.contains("adult search")) {
+                    stringResource(R.string.adult_search_blocked_title)
+                } else {
+                    stringResource(R.string.blocked_overlay_title)
+                },
+            )
         }
     }
 }
@@ -466,7 +505,7 @@ private fun TestRunView(
  * Simple, clean: title, short explanation, Back/Close.
  */
 @Composable
-fun BlockedOverlay(onBack: () -> Unit) {
+fun BlockedOverlay(onBack: () -> Unit, title: String = stringResource(R.string.blocked_overlay_title)) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -494,7 +533,7 @@ fun BlockedOverlay(onBack: () -> Unit) {
             }
             Spacer(Modifier.height(16.dp))
             Text(
-                text = stringResource(R.string.blocked_overlay_title),
+                text = title,
                 style = typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
