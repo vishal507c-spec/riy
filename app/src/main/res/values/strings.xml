@@ -8,7 +8,7 @@
     <string name="status_protection_off">Protection OFF</string>
     <string name="status_connecting">Starting protection…</string>
     <string name="status_protection_failed">Protection FAILED</string>
-    <string name="status_detail_active">VPN filter is active. Adult sites are blocked system-wide.</string>
+    <string name="status_detail_active">VPN filter is active. Adult sites are blocked system-wide and Google SafeSearch is enforced.</string>
     <string name="status_detail_connecting">Activating the VPN filter…</string>
     <string name="status_detail_failed">The filter could not start (VPN permission revoked or another VPN is active). Tap Enable Protection to retry.</string>
     <string name="status_detail_off">No filtering is running right now.</string>
@@ -23,7 +23,7 @@
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
-    <string name="settings_info_lines">• Protection keeps running in the background and is restored after reboot.\n• For maximum reliability, turn on “Always-On VPN” for Riy in Android VPN settings.\n• Only DNS traffic is filtered — nothing is decrypted or inspected.</string>
+    <string name="settings_info_lines">• Protection keeps running in the background and is restored after reboot.\n• Google, Bing, DuckDuckGo, Yandex SafeSearch and YouTube Restricted mode are enforced at DNS level — they cannot be turned off from browser/app settings while protection is ON.\n• For maximum reliability, turn on “Always-On VPN” for Riy in Android VPN settings.\n• Only DNS traffic is filtered — nothing is decrypted or inspected.</string>
     <string name="settings_open_vpn">Open Android VPN settings</string>
 
     <!-- Protection test -->

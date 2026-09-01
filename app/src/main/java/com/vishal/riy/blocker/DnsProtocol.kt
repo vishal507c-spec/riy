@@ -74,8 +74,8 @@ internal object DnsProtocol {
     fun buildBlockedResponse(query: ByteArray): ByteArray? {
         val q = question(query) ?: return null
         return when (q.type) {
-            TYPE_A -> responseWithAddress(query, q, TYPE_A, rdataLen = 4)
-            TYPE_AAAA -> responseWithAddress(query, q, TYPE_AAAA, rdataLen = 16)
+            TYPE_A -> responseWithAddress(query, q, TYPE_A, ByteArray(4))
+            TYPE_AAAA -> responseWithAddress(query, q, TYPE_AAAA, ByteArray(16))
             else -> {
                 // Other record types (HTTPS RR, TXT, MX...): answer with
                 // NOERROR/NODATA. NXDOMAIN here would make Chromium treat the
@@ -84,6 +84,65 @@ internal object DnsProtocol {
                 responseNoAnswer(query, q, rcode = 0)
             }
         }
+    }
+
+    /**
+     * Response carrying a single A (4 bytes) or AAAA (16 bytes) answer for the
+     * echoed question — used by SafeSearch VIP pinning.
+     */
+    fun buildAddressResponse(query: ByteArray, q: DnsQuestion, address: ByteArray): ByteArray? {
+        val type = when (address.size) {
+            4 -> TYPE_A
+            16 -> TYPE_AAAA
+            else -> return null
+        }
+        return responseWithAddress(query, q, type, address)
+    }
+
+    /** NOERROR/NODATA response (question echoed, no answers). */
+    fun buildNoDataResponse(query: ByteArray, q: DnsQuestion): ByteArray =
+        responseNoAnswer(query, q, rcode = 0)
+
+    /**
+     * Extracts the rdata of the FIRST record of [type] (A or AAAA) from a DNS
+     * response, transparently skipping the question section and any CNAME
+     * chain records. Returns null when no matching record exists.
+     */
+    fun firstAddressRdata(response: ByteArray, type: Int): ByteArray? {
+        if (response.size < HEADER_SIZE) return null
+        if (type != TYPE_A && type != TYPE_AAAA) return null
+        var i = HEADER_SIZE
+        repeat(u16(response, 4)) { // QDCOUNT
+            i = skipName(response, i)
+            i += 4
+        }
+        repeat(u16(response, 6)) { // ANCOUNT
+            if (i >= response.size) return null
+            i = skipName(response, i)
+            if (i + 10 > response.size) return null
+            val rtype = u16(response, i)
+            val rdlength = u16(response, i + 8)
+            if (i + 10 + rdlength > response.size) return null
+            if (rtype == type && rdlength == expectedRdlength(type)) {
+                return response.copyOfRange(i + 10, i + 10 + rdlength)
+            }
+            i += 10 + rdlength
+        }
+        return null
+    }
+
+    private fun expectedRdlength(type: Int): Int = if (type == TYPE_A) 4 else 16
+
+    /** Skips a (possibly compressed) domain name; returns the offset after it. */
+    private fun skipName(b: ByteArray, from: Int): Int {
+        var j = from
+        while (j < b.size) {
+            val len = u8(b, j)
+            if (len == 0) return j + 1
+            if (len and 0xC0 != 0) return j + 2 // compression pointer
+            j += 1 + len
+        }
+        return j
     }
 
     /** SERVFAIL response used when no upstream resolver is reachable. */
@@ -121,9 +180,9 @@ internal object DnsProtocol {
         query: ByteArray,
         q: DnsQuestion,
         type: Int,
-        rdataLen: Int,
+        rdata: ByteArray,
     ): ByteArray {
-        val out = ByteArrayOutputStream(q.questionEnd + 10 + 4 + rdataLen)
+        val out = ByteArrayOutputStream(q.questionEnd + 12 + rdata.size)
         val rd = u16(query, 2) and FLAG_RD
         writeHeader(out, u16(query, 0), (FLAG_QR or FLAG_RA or rd).toShort(), anCount = 1)
         out.write(query, HEADER_SIZE, q.questionEnd - HEADER_SIZE) // echoed question
@@ -131,8 +190,8 @@ internal object DnsProtocol {
         writeU16(out, type)
         writeU16(out, CLASS_IN)
         writeU32(out, BLOCKED_TTL_SECONDS)
-        writeU16(out, rdataLen)
-        repeat(rdataLen) { out.write(0) } // 0.0.0.0 or ::
+        writeU16(out, rdata.size)
+        out.write(rdata)
         return out.toByteArray()
     }
 

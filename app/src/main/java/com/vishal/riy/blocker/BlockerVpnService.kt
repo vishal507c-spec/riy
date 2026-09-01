@@ -62,6 +62,19 @@ class BlockerVpnService : VpnService() {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var retryAttempt = 0
 
+    /**
+     * Network-level SafeSearch enforcement: search engines are DNS-pinned to
+     * their own "safe" frontends (valid certificates, server-side filtering).
+     */
+    private val safeSearchEnforcer = SafeSearchEnforcer(
+        scope = { scope },
+        resolve = { name, type ->
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                queryUpstreams(SafeSearchRules.buildDnsQuery(name, type))
+            }
+        },
+    )
+
     /** Boot-time establish retry: system VPN state may not be ready yet. */
     private val retryRunnable = Runnable {
         if (running.get()) return@Runnable
@@ -187,11 +200,13 @@ class BlockerVpnService : VpnService() {
         running.set(true)
         vpnInterface = fd
         scope = newScope()
+        // Prime the SafeSearch VIP cache early (fire-and-forget, never blocks).
+        scope.launch { runCatching { safeSearchEnforcer.refreshAll() } }
         worker = thread(name = "riy-dns-filter", isDaemon = true) {
             runFilterLoop(fd, blocklist)
         }
         BlockerState.update(BlockerState.Phase.CONNECTED)
-        Log.i(TAG, "protection active (${blocklist.ruleCount} blocklist rules)")
+        Log.i(TAG, "protection active (${blocklist.ruleCount} blocklist rules, SafeSearch enforced)")
     }
 
     private fun stopFiltering() {
@@ -252,23 +267,18 @@ class BlockerVpnService : VpnService() {
         val input = FileInputStream(fd.fileDescriptor)
         val output = FileOutputStream(fd.fileDescriptor)
         val buffer = ByteArray(READ_BUFFER_SIZE)
-        var zeroReads = 0
         while (running.get()) {
             val length = try {
                 input.read(buffer)
             } catch (e: IOException) {
                 Log.i(TAG, "tun read failed (interface closed): ${e.message}")
-                break // interface closed (stop/revoke)
+                break // interface closed (stop/revoke) — the only real EOF signal
             }
             if (length <= 0) {
-                // A single 0 can be a transient tun artifact on some
-                // kernels/emulators; only a sustained EOF (interface really
-                // closed) ends the loop. Sleep avoids a busy-wait.
-                zeroReads++
-                if (zeroReads >= 150) { // ~30s of continuous EOF
-                    Log.i(TAG, "tun EOF sustained; exiting loop")
-                    break
-                }
+                // Some kernels/emulators return 0 (EAGAIN-as-0) when the tun
+                // has no pending packet. This is NOT an EOF: a true teardown
+                // surfaces as an IOException once the fd is closed. Sleep and
+                // keep the loop alive so DNS never blackholes during idle gaps.
                 try {
                     Thread.sleep(200)
                 } catch (_: InterruptedException) {
@@ -277,7 +287,6 @@ class BlockerVpnService : VpnService() {
                 }
                 continue
             }
-            zeroReads = 0
             try {
                 processPacket(buffer, length, output, blocklist)
             } catch (e: Exception) {
@@ -302,7 +311,13 @@ class BlockerVpnService : VpnService() {
             BlockerState.incrementBlocked()
             writeReply(output, IpPacket.buildReply(parsed, response))
         } else {
-            scope.launch { forwardAndReply(dns, parsed, output) }
+            // SafeSearch pinning answers locally; everything else is forwarded.
+            val safeAnswer = safeSearchEnforcer.answerFor(dns, question)
+            if (safeAnswer != null) {
+                writeReply(output, IpPacket.buildReply(parsed, safeAnswer))
+            } else {
+                scope.launch { forwardAndReply(dns, parsed, output) }
+            }
         }
     }
 
@@ -485,6 +500,10 @@ class BlockerVpnService : VpnService() {
             "119.29.29.29",
             "180.76.76.76",
             "156.154.70.1", "156.154.71.1",
+            "4.2.2.1", "4.2.2.2", "4.2.2.3", "4.2.2.4", "4.2.2.5", "4.2.2.6", // Level3
+            "84.200.69.80", "84.200.82.80",     // DNS.WATCH
+            "8.26.56.26", "8.20.247.20",        // Comodo
+            "216.146.35.35", "216.146.36.36",   // Dyn
             "10.0.2.3", // Android emulator goldfish DNS (harmless on real devices)
         )
         private val INTERCEPTED_RESOLVERS_V6 = listOf(
@@ -495,8 +514,15 @@ class BlockerVpnService : VpnService() {
             "2a10:50c0::ad1:ff", "2a10:50c0::ad2:ff",       // AdGuard
         )
 
-        /** Starts the protection service (foreground service on O+). */
-        fun start(context: Context, allowRetry: Boolean = false) {
+        /**
+         * Starts the protection service (foreground service on O+).
+         * Establish failures arm a retry loop: right after boot the system
+         * VPN state may not be ready yet (and some OEMs/AVDs fail
+         * background-started establishes) — a 2-minute retry window covers
+         * both without user interaction. The status stays honest throughout:
+         * CONNECTING while retrying, FAILED only after all attempts.
+         */
+        fun start(context: Context, allowRetry: Boolean = true) {
             val intent = Intent(context, BlockerVpnService::class.java)
                 .setAction(ACTION_START)
                 .putExtra(EXTRA_ALLOW_RETRY, allowRetry)

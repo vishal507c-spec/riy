@@ -223,6 +223,62 @@ class DnsFilterEngineTest {
         assertNull(IpPacket.parseUdpDns(fragment, fragment.size))
     }
 
+    @Test
+    fun `address response carries the pinned IPv4 and IPv6 answers`() {
+        val query = dnsQuery("www.google.com", type = 1)
+        val q = DnsProtocol.question(query)!!
+        val v4Response = DnsProtocol.buildAddressResponse(query, q, byteArrayOf(216.toByte(), 239.toByte(), 38, 120))!!
+        assertEquals(1, u16(v4Response, 6)) // one answer
+        assertEquals(4, u16(v4Response, v4Response.size - 6)) // RDLENGTH at end
+        assertTrue(
+            v4Response.copyOfRange(v4Response.size - 4, v4Response.size)
+                .contentEquals(byteArrayOf(216.toByte(), 239.toByte(), 38, 120)),
+        )
+
+        val aaaaQuery = dnsQuery("www.google.com", type = 28)
+        val aaaaQ = DnsProtocol.question(aaaaQuery)!!
+        val v6 = ByteArray(16) { (it + 1).toByte() }
+        val v6Response = DnsProtocol.buildAddressResponse(aaaaQuery, aaaaQ, v6)!!
+        assertEquals(28, u16(v6Response, v6Response.size - 26)) // TYPE AAAA
+        assertTrue(v6Response.copyOfRange(v6Response.size - 16, v6Response.size).contentEquals(v6))
+    }
+
+    @Test
+    fun `address response rejects invalid address length`() {
+        val query = dnsQuery("www.google.com", type = 1)
+        val q = DnsProtocol.question(query)!!
+        assertNull(DnsProtocol.buildAddressResponse(query, q, ByteArray(6)))
+    }
+
+    @Test
+    fun `noDataResponse is NOERROR with no answers and echoes the question`() {
+        val query = dnsQuery("www.google.com", type = 65)
+        val q = DnsProtocol.question(query)!!
+        val response = DnsProtocol.buildNoDataResponse(query, q)
+        assertEquals(0, u16(response, 2) and 0x000F)
+        assertEquals(0, u16(response, 6))
+        assertEquals(query.size, response.size)
+        for (i in 12 until query.size) assertEquals(query[i], response[i])
+    }
+
+    @Test
+    fun `firstAddressRdata extracts A through a CNAME chain`() {
+        // Build an upstream reply for forcesafesearch.google.com (single A).
+        val query = dnsQuery("forcesafesearch.google.com", type = 1)
+        val q = DnsProtocol.question(query)!!
+        val response = DnsProtocol.buildAddressResponse(query, q, byteArrayOf(216.toByte(), 239.toByte(), 38, 120))!!
+        val rdata = DnsProtocol.firstAddressRdata(response, 1)!!
+        assertTrue(rdata.contentEquals(byteArrayOf(216.toByte(), 239.toByte(), 38, 120)))
+        assertNull(DnsProtocol.firstAddressRdata(response, 28)) // no AAAA present
+    }
+
+    @Test
+    fun `firstAddressRdata handles malformed input`() {
+        assertNull(DnsProtocol.firstAddressRdata(ByteArray(0), 1))
+        assertNull(DnsProtocol.firstAddressRdata(ByteArray(12), 1))
+        assertNull(DnsProtocol.firstAddressRdata(dnsQuery("a.com"), 16))
+    }
+
     // --------------------------------------------------------------- helpers
 
     private fun bytes(vararg values: Int): ByteArray = ByteArray(values.size) { values[it].toByte() }

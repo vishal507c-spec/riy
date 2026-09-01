@@ -49,6 +49,7 @@ import com.vishal.riy.blocker.BlockerState
 import com.vishal.riy.blocker.Blocklist
 
 private val TEST_SITES = listOf(
+    "https://www.google.com/search?q=porn" to "Google explicit search (SafeSearch check)",
     "https://www.pornhub.com/" to "Pornhub (adult site)",
     "https://www.xvideos.com/" to "XVideos (adult site)",
     "https://www.wikipedia.org/" to "Wikipedia (normal site)",
