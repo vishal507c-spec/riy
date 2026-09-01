@@ -1,6 +1,52 @@
 <resources>
     <string name="app_name">Riy</string>
     <string name="app_version_label">Version %1$s</string>
+    <string name="app_tagline">Adult content blocker</string>
+
+    <!-- Protection status (always the REAL service state) -->
+    <string name="status_protection_on">Protection ON</string>
+    <string name="status_protection_off">Protection OFF</string>
+    <string name="status_connecting">Starting protection…</string>
+    <string name="status_protection_failed">Protection FAILED</string>
+    <string name="status_detail_active">VPN filter is active. Adult sites are blocked system-wide.</string>
+    <string name="status_detail_connecting">Activating the VPN filter…</string>
+    <string name="status_detail_failed">The filter could not start (VPN permission revoked or another VPN is active). Tap Enable Protection to retry.</string>
+    <string name="status_detail_off">No filtering is running right now.</string>
+    <string name="blocked_counter_label">Blocked attempts: %1$d</string>
+
+    <!-- Actions -->
+    <string name="action_enable_protection">Enable Protection</string>
+    <string name="action_disable_protection">Disable Protection</string>
+    <string name="action_test_protection">Check / Test Protection</string>
+    <string name="action_back">Back</string>
+    <string name="action_back_to_tests">Back to tests</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_info_lines">• Protection keeps running in the background and is restored after reboot.\n• For maximum reliability, turn on “Always-On VPN” for Riy in Android VPN settings.\n• Only DNS traffic is filtered — nothing is decrypted or inspected.</string>
+    <string name="settings_open_vpn">Open Android VPN settings</string>
+
+    <!-- Protection test -->
+    <string name="test_title">Protection Test</string>
+    <string name="test_description">Open a known adult site and a normal site inside this app. If protection is active, the adult site will show the blocked screen; the normal site will load normally.</string>
+    <string name="test_status_on">Protection is ON — adult sites should show “Content Blocked”.</string>
+    <string name="test_status_off">Protection is OFF — adult sites will load. Enable protection first for a valid test.</string>
+    <string name="test_loading">Loading…</string>
+    <string name="test_result_allowed">Loaded OK — normal websites work.</string>
+    <string name="test_result_not_blocked">WARNING: this adult site LOADED — protection is not blocking it!</string>
+    <string name="test_result_load_error">Site did not load (network error).</string>
+
+    <!-- Blocked screen -->
+    <string name="blocked_overlay_icon">✕</string>
+    <string name="blocked_overlay_title">Content Blocked</string>
+    <string name="blocked_overlay_message">This site may contain adult content and is blocked by Riy Protection. If you believe this is a mistake, close this page.</string>
+    <string name="blocked_overlay_close">Close</string>
+
+    <!-- VPN service -->
+    <string name="blocker_vpn_session">Riy Adult Content Filter</string>
+    <string name="blocker_notification_channel">Protection status</string>
+    <string name="blocker_notification_title">Protection is ON</string>
+    <string name="blocker_notification_text">Adult websites are being blocked</string>
 
     <!-- Update dialog -->
     <string name="update_title">New Update Available</string>

@@ -2,10 +2,15 @@ package com.vishal.riy
 
 import android.os.Bundle
 import android.util.Log
+import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
+import com.vishal.riy.blocker.BlockerState
+import com.vishal.riy.blocker.BlockerStateStore
+import com.vishal.riy.blocker.BlockerVpnService
+import com.vishal.riy.ui.RiyApp
 import com.vishal.riy.update.ReleaseInfo
 import com.vishal.riy.update.UpdateChecker
 import com.vishal.riy.update.UpdateDialogFragment
@@ -17,9 +22,10 @@ import kotlinx.coroutines.launch
 private const val LOG_TAG = "RiyUpdate"
 
 /**
- * Minimal main screen. The ONLY feature-specific behaviour here is an
- * asynchronous update check fired on startup: it runs on Dispatchers.IO,
- * never blocks rendering, and silently no-ops on any failure.
+ * App entry point. Jetpack Compose renders the protection UI; the only other
+ * feature-specific behaviour is the asynchronous update check fired on
+ * startup (unchanged): it runs on Dispatchers.IO, never blocks rendering,
+ * and silently no-ops on any failure.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -33,13 +39,37 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        // Dynamic version label: uses the actual versionName from the build config,
-        // never a hard-coded string.
-        findViewById<android.widget.TextView>(R.id.versionText).text =
-            getString(R.string.app_version_label, BuildConfig.VERSION_NAME)
+        setContent {
+            RiyApp()
+        }
         updatePreferences = UpdatePreferences(this)
         scheduleUpdateCheck()
+        restoreProtectionIfInterrupted()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        restoreProtectionIfInterrupted()
+    }
+
+    /**
+     * Self-heal: if the user wants protection but the service is not running
+     * (process death, update kill, missed boot broadcast), restart it. This
+     * never overrides a real OFF/FAILED reported by the service itself.
+     */
+    private fun restoreProtectionIfInterrupted() {
+        val phase = BlockerState.current().phase
+        if (BlockerStateStore(this).isProtectionWanted() &&
+            phase != BlockerState.Phase.CONNECTED &&
+            phase != BlockerState.Phase.CONNECTING
+        ) {
+            Log.i("BlockerApp", "protection wanted but $phase — restarting service")
+            try {
+                BlockerVpnService.start(this)
+            } catch (e: Exception) {
+                Log.e("BlockerApp", "failed to restart protection", e)
+            }
+        }
     }
 
     private fun scheduleUpdateCheck() {

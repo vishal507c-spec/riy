@@ -1,0 +1,97 @@
+# Riy adult-content blocklist
+# One domain per line. A rule matches the domain itself and every subdomain.
+# Lines starting with '#' are comments. Matching is case-insensitive.
+# NOTE: additionally, at code level the app blocks: any domain containing
+# "porn", "hentai" or "xnxx"; any label equal to porn/sex/xxx/adult/hentai/
+# nude/nudes; and the dedicated adult TLDs .xxx .adult .porn .sex .sexy.
+
+# --- Major tube sites ---
+pornhub.com
+xvideos.com
+xvideos2.com
+xvideos3.com
+xvideos4.com
+xvideos5.com
+xnxx.com
+xhamster.com
+xhamster.desi
+xhamster.one
+xhamster2.com
+xhamster3.com
+redtube.com
+tube8.com
+keezmovies.com
+empflix.com
+tnaflix.com
+spankbang.com
+eporner.com
+motherless.com
+imagefap.com
+beeg.com
+4tube.com
+thisvid.com
+erome.com
+xtapes.to
+porntrex.com
+pornhd.com
+
+# --- Cam sites ---
+chaturbate.com
+stripchat.com
+cam4.com
+camsoda.com
+bongacams.com
+livejasmin.com
+myfreecams.com
+camster.com
+flirt4free.com
+streamate.com
+imlive.com
+camwhores.tv
+camvideos.tv
+
+# --- Creator / subscription platforms ---
+onlyfans.com
+fansly.com
+manyvids.com
+iwantclips.com
+clips4sale.com
+justfor.fans
+
+# --- Studios / premium networks ---
+brazzers.com
+bangbros.com
+realitykings.com
+mofos.com
+teamskeet.com
+naughtyamerica.com
+digitalplayground.com
+twistys.com
+blacked.com
+tushy.com
+vixen.com
+metart.com
+hustler.com
+playboyplus.com
+
+# --- Hentai / anime ---
+hanime.tv
+e-hentai.org
+hitomi.la
+gelbooru.com
+rule34video.com
+8muses.com
+hentai2read.com
+hentaicloud.com
+
+# --- Gay / other niches ---
+men.com
+bromo.com
+seancody.com
+helixstudios.com
+redgifs.com
+fapello.com
+javmost.com
+missav.com
+sex.com
+4chan.org

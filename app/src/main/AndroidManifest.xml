@@ -7,6 +7,12 @@
          Android still enforces signature checks at install time. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Content blocker: persistent foreground VPN service + reboot restore. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
@@ -21,6 +27,31 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- DNS-filtering VPN service. Only the system (which holds
+             BIND_VPN_SERVICE) may bind it. The android.net.VpnService action
+             enables the system "Always-On VPN" option. -->
+        <service
+            android:name=".blocker.BlockerVpnService"
+            android:exported="true"
+            android:foregroundServiceType="specialUse"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="DNS-based adult content filtering VPN" />
+        </service>
+
+        <!-- Restores protection automatically after a device reboot. -->
+        <receiver
+            android:name=".blocker.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <!-- FileProvider used to hand the downloaded, verified APK to the
              system package installer. The file lives in app-external storage
