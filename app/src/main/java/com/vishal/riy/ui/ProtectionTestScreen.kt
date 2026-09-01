@@ -53,9 +53,14 @@ import com.vishal.riy.blocker.BlockerState
 import com.vishal.riy.blocker.Blocklist
 
 private val TEST_SITES = listOf(
+    "https://www.google.com/search?q=hot+photo&tbm=isch" to "Google Images 'hot photo' (classifier check)",
+    "https://www.google.com/search?q=sexy+photo&tbm=isch" to "Google Images 'sexy photo' (classifier check)",
+    "https://www.google.com/search?q=hot+girl&tbm=isch" to "Google Images 'hot girl' (classifier check)",
+    "https://www.google.com/search?q=sexy+girl&tbm=isch" to "Google Images 'sexy girl' (classifier check)",
+    "https://www.google.com/search?q=nude&tbm=isch" to "Google Images 'nude' (SafeSearch + classifier)",
+    "https://www.google.com/search?q=fashion+dress&tbm=isch" to "Google Images 'fashion dress' (FP check)",
     "https://www.google.com/search?q=porn" to "Google explicit search (SafeSearch check)",
     "https://www.google.com/search?q=porn&tbm=isch" to "Google Images explicit (SafeSearch check)",
-    "https://www.google.com/search?q=hot+girl&tbm=isch" to "Google Images 'hot girl' (classifier check)",
     "https://thechive.com/" to "Suggestive photos site (classifier check)",
     "https://commons.wikimedia.org/wiki/Category:Nudity" to "Explicit nudity check (Wikimedia education)",
     "https://www.pornhub.com/" to "Pornhub (adult site)",
@@ -155,11 +160,29 @@ private class TestWebViewClient(
     )
 
     /**
+     * True while the current page is an image-SEARCH result page (Google
+     * Images etc.): there the user explicitly asked a search engine for
+     * images, so the strict NSFW threshold applies.
+     */
+    @Volatile private var strictImageSearchPage = false
+
+    private fun isImageSearchPage(url: android.net.Uri): Boolean {
+        val host = url.host ?: return false
+        val isGoogle = host == "www.google.com" || host.endsWith(".google.com")
+        if (!isGoogle) return false
+        val query = url.query ?: return false
+        return query.contains("tbm=isch") || query.contains("udm=2")
+    }
+
+    /**
      * Content filtering for every resource loaded inside the app's WebView:
      *  1. Adult hosts / explicit-URL assets -> dropped (no TLS inspection).
      *  2. Image subresources -> bytes are fetched and classified ON-DEVICE
      *     (Yahoo OpenNSFW TFLite): explicit imagery is replaced by a blocked
      *     placeholder; safe images are returned unchanged.
+     *  3. On image-search result pages the STRICT threshold applies, catching
+     *     the "highly suggestive but non-explicit" band Google SafeSearch
+     *     leaves visible ("hot photo" / "sexy photo" results).
      */
     override fun shouldInterceptRequest(
         view: WebView?,
@@ -167,21 +190,20 @@ private class TestWebViewClient(
     ): WebResourceResponse? {
         request ?: return null
         val url = request.url
+        if (request.isForMainFrame) {
+            strictImageSearchPage = isImageSearchPage(url)
+            return null
+        }
         val decision = WebContentFilter.decide(url.host, url.toString(), filterBlocklist)
         if (decision != WebContentFilter.Decision.ALLOW) {
-            if (request.isForMainFrame) {
-                onResult(TestResult.Blocked(url.toString(), "blocked by Riy in-app filter"))
-            } else {
-                onAssetBlocked()
-            }
-            return blockedResponse(request.isForMainFrame)
+            onAssetBlocked()
+            return blockedResponse(mainFrame = false)
         }
-        if (request.isForMainFrame) return null
         if (!isImageResource(url.toString())) return null
 
         ImageClassifier.ensureInit(view?.context ?: return null)
         val bytes = fetchImage(url.toString()) ?: return null
-        val nsfw = ImageClassifier.classify(url.toString(), bytes)
+        val nsfw = ImageClassifier.classify(url.toString(), bytes, strictImageSearchPage)
         if (nsfw) {
             onAssetBlocked()
             return blockedResponse(mainFrame = false)

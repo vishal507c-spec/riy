@@ -29,8 +29,18 @@ object ImageClassifier {
 
     private const val TAG = "NsfwClassifier"
 
-    /** >= this NSFW score blocks the image. Tuned on-device (see E2E report). */
+    /**
+     * Decision thresholds. Google's own SafeSearch leaves "highly suggestive
+     * but non-explicit" imagery (score band ~0.30-0.60) visible, which is the
+     * reported "hot/sexy photo" gap. Two tiers fix it without mass false
+     * positives:
+     *  - [STRICT_THRESHOLD] applies on image-SEARCH result pages only (the
+     *    user explicitly asked a search engine for images there).
+     *  - [THRESHOLD] applies everywhere else (fashion/beach/celebrity pages
+     *    must keep working — swimwear scores ~0.1-0.4 on this model).
+     */
     internal const val THRESHOLD = 0.60f
+    internal const val STRICT_THRESHOLD = 0.35f
 
     /** Images larger than this are skipped (model input is 224x224 anyway). */
     internal const val MAX_BYTES = 6 * 1024 * 1024
@@ -65,23 +75,33 @@ object ImageClassifier {
     /**
      * Classifies raw image bytes. Returns true = NSFW (block), false = safe
      * (or classification unavailable / not an image — fail-open).
+     *
+     * [strict] lowers the threshold on image-search result pages (see the
+     * threshold docs above). The cache key must include the tier.
      */
-    fun classify(cacheKey: String, bytes: ByteArray): Boolean {
-        cache[cacheKey]?.let { return it }
-        val decision = runCatching { classifyInternal(bytes) }.getOrDefault(false)
-        synchronized(cache) { cache[cacheKey] = decision }
+    fun classify(cacheKey: String, bytes: ByteArray, strict: Boolean = false): Boolean {
+        val tier = if (strict) "s:" else "n:"
+        val key = tier + cacheKey
+        cache[key]?.let { return it }
+        val decision = runCatching { classifyInternal(bytes, strict) }.getOrDefault(false)
+        synchronized(cache) { cache[key] = decision }
         return decision
     }
 
-    internal fun isNsfw(nsfwScore: Float): Boolean = nsfwScore >= THRESHOLD
+    internal fun isNsfw(nsfwScore: Float, strict: Boolean = false): Boolean =
+        nsfwScore >= (if (strict) STRICT_THRESHOLD else THRESHOLD)
 
-    private fun classifyInternal(bytes: ByteArray): Boolean {
+    private fun classifyInternal(bytes: ByteArray, strict: Boolean): Boolean {
         if (!initialized || bytes.size > MAX_BYTES || bytes.isEmpty()) return false
         val bitmap: Bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return false
         val score = NSFWHelper.getNSFWScore(bitmap)
         bitmap.recycle()
-        val blocked = isNsfw(score.nsfwScore)
-        Log.i(TAG, "nsfw=${score.nsfwScore} decision=${if (blocked) "BLOCK" else "allow"}")
+        val blocked = isNsfw(score.nsfwScore, strict)
+        Log.i(
+            TAG,
+            "nsfw=${score.nsfwScore} tier=${if (strict) "strict" else "normal"} " +
+                "decision=${if (blocked) "BLOCK" else "allow"}",
+        )
         return blocked
     }
 }
