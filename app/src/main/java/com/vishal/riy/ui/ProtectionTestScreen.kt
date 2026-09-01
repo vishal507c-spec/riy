@@ -10,6 +10,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.vishal.riy.blocker.ImageClassifier
 import com.vishal.riy.blocker.WebContentFilter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -54,6 +55,9 @@ import com.vishal.riy.blocker.Blocklist
 private val TEST_SITES = listOf(
     "https://www.google.com/search?q=porn" to "Google explicit search (SafeSearch check)",
     "https://www.google.com/search?q=porn&tbm=isch" to "Google Images explicit (SafeSearch check)",
+    "https://www.google.com/search?q=hot+girl&tbm=isch" to "Google Images 'hot girl' (classifier check)",
+    "https://thechive.com/" to "Suggestive photos site (classifier check)",
+    "https://commons.wikimedia.org/wiki/Category:Nudity" to "Explicit nudity check (Wikimedia education)",
     "https://www.pornhub.com/" to "Pornhub (adult site)",
     "https://www.xvideos.com/" to "XVideos (adult site)",
     "https://www.wikipedia.org/" to "Wikipedia (normal site)",
@@ -151,9 +155,11 @@ private class TestWebViewClient(
     )
 
     /**
-     * URL-level content classification for every resource (images, scripts,
-     * frames) loaded inside the app's WebView: adult hosts and explicit-URL
-     * assets are dropped WITHOUT any TLS interception.
+     * Content filtering for every resource loaded inside the app's WebView:
+     *  1. Adult hosts / explicit-URL assets -> dropped (no TLS inspection).
+     *  2. Image subresources -> bytes are fetched and classified ON-DEVICE
+     *     (Yahoo OpenNSFW TFLite): explicit imagery is replaced by a blocked
+     *     placeholder; safe images are returned unchanged.
      */
     override fun shouldInterceptRequest(
         view: WebView?,
@@ -162,26 +168,26 @@ private class TestWebViewClient(
         request ?: return null
         val url = request.url
         val decision = WebContentFilter.decide(url.host, url.toString(), filterBlocklist)
-        if (decision == WebContentFilter.Decision.ALLOW) return null
-        if (request.isForMainFrame) {
-            // Initial navigation blocked by the in-app filter (e.g. when the
-            // DNS layer was bypassed) — report it as a blocked result too.
-            onResult(TestResult.Blocked(url.toString(), "blocked by Riy in-app filter"))
-        } else {
+        if (decision != WebContentFilter.Decision.ALLOW) {
+            if (request.isForMainFrame) {
+                onResult(TestResult.Blocked(url.toString(), "blocked by Riy in-app filter"))
+            } else {
+                onAssetBlocked()
+            }
+            return blockedResponse(request.isForMainFrame)
+        }
+        if (request.isForMainFrame) return null
+        if (!isImageResource(url.toString())) return null
+
+        ImageClassifier.ensureInit(view?.context ?: return null)
+        val bytes = fetchImage(url.toString()) ?: return null
+        val nsfw = ImageClassifier.classify(url.toString(), bytes)
+        if (nsfw) {
             onAssetBlocked()
+            return blockedResponse(mainFrame = false)
         }
-        val html = if (request.isForMainFrame) {
-            "<html><body style='background:#1b1b1b;color:#fff;font-family:sans-serif;" +
-                "display:flex;align-items:center;justify-content:center;height:100%'>" +
-                "<h3>Content Blocked</h3></body></html>"
-        } else {
-            ""
-        }
-        return WebResourceResponse(
-            "text/html", "utf-8", 403, "Blocked by Riy Protection",
-            mapOf("Cache-Control" to "no-store"),
-            html.byteInputStream(),
-        )
+        val contentType = guessContentType(url.toString())
+        return WebResourceResponse(contentType, null, bytes.inputStream())
     }
 
     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -234,12 +240,75 @@ private class TestWebViewClient(
     }
 }
 
-/** Test hosts are classified by the same matching logic as the filter. */
-private object BlocklistTestHelper {
-    private val blocklist = Blocklist(listOf("pornhub.com", "xvideos.com"))
+    /** Test hosts are classified by the same matching logic as the filter. */
+    private object BlocklistTestHelper {
+        private val blocklist = Blocklist(listOf("pornhub.com", "xvideos.com"))
 
-    fun isAdult(host: String): Boolean = blocklist.contains(host)
-}
+        fun isAdult(host: String): Boolean = blocklist.contains(host)
+    }
+
+    private fun blockedResponse(mainFrame: Boolean): WebResourceResponse {
+        val body = if (mainFrame) {
+            "<html><body style='background:#1b1b1b;color:#fff;font-family:sans-serif;" +
+                "display:flex;align-items:center;justify-content:center;height:100%'>" +
+                "<h3>Content Blocked</h3></body></html>"
+        } else {
+            ""
+        }
+        return WebResourceResponse(
+            "text/html", "utf-8", 403, "Blocked by Riy Protection",
+            mapOf("Cache-Control" to "no-store"),
+            body.byteInputStream(),
+        )
+    }
+
+    private fun isImageResource(url: String): Boolean {
+        val path = url.substringBefore('?').lowercase()
+        if (path.endsWith(".jpg") || path.endsWith(".jpeg") || path.endsWith(".png") ||
+            path.endsWith(".webp") || path.endsWith(".gif")
+        ) {
+            return true
+        }
+        // googleusercontent-style thumbnail hosts have no file extension.
+        val host = Uri.parse(url).host ?: return false
+        return host.contains("googleusercontent") || host.contains("gstatic")
+    }
+
+    /** Fetches image bytes for classification (bounded, on the WebView IO thread). */
+    private fun fetchImage(url: String): ByteArray? {
+        return try {
+            val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+            try {
+                connection.connectTimeout = 6000
+                connection.readTimeout = 6000
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) RiyFilter")
+                if (connection.responseCode != 200) return null
+                val input = connection.inputStream
+                val out = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(16 * 1024)
+                var read: Int
+                while (input.read(buffer).also { read = it } != -1) {
+                    out.write(buffer, 0, read)
+                    if (out.size() > ImageClassifier.MAX_BYTES) return null
+                }
+                out.toByteArray()
+            } finally {
+                connection.disconnect()
+            }
+        } catch (_: Exception) {
+            null // fail-open: unreachable image stays visible rather than breaking the page
+        }
+    }
+
+    private fun guessContentType(url: String): String {
+        val path = url.substringBefore('?').lowercase()
+        return when {
+            path.endsWith(".png") -> "image/png"
+            path.endsWith(".webp") -> "image/webp"
+            path.endsWith(".gif") -> "image/gif"
+            else -> "image/jpeg"
+        }
+    }
 
 @Composable
 private fun SitePicker(onPick: (String) -> Unit, onBack: () -> Unit) {
