@@ -65,6 +65,28 @@ class BlocklistTest {
         assertTrue(blocklist.contains("anything.sexy"))
     }
 
+    @Test
+    fun `blocks adult brand mirrors via brand substrings`() {
+        // Mirror/CDN TLDs of adult brands that are not in the exact list.
+        assertTrue(blocklist.contains("xhamster.one")) // exact rule, but also:
+        assertTrue(blocklist.contains("xhamster.io"))
+        assertTrue(blocklist.contains("redtube.io"))
+        assertTrue(blocklist.contains("chaturbate.asia"))
+        assertTrue(blocklist.contains("stripchat.net"))
+        assertTrue(blocklist.contains("onlyfans.blog"))
+        assertTrue(blocklist.contains("missav.ws"))
+        assertTrue(blocklist.contains("rule34.video"))
+        assertTrue(blocklist.contains("static.redgifs.net"))
+    }
+
+    @Test
+    fun `blocks suggestive token labels`() {
+        assertTrue(blocklist.contains("nsfw.com"))
+        assertTrue(blocklist.contains("sexy.xxx"))
+        assertTrue(blocklist.contains("boobs.gallery"))
+        assertTrue(blocklist.contains("erotic.art"))
+    }
+
     // ------------------------------------------------------ false positives
 
     @Test
@@ -98,6 +120,20 @@ class BlocklistTest {
         assertFalse(blocklist.contains("adult-blog.wikipedia.org"))
         assertFalse(blocklist.contains("sex-history.github.io"))
         assertFalse(blocklist.contains("adult.example.net"))
+    }
+
+    @Test
+    fun `new suggestive heuristics keep innocent lookalikes allowed`() {
+        // "nsfw" is a whole-label token: the ML library nsfwjs.com stays up.
+        assertFalse(blocklist.contains("nsfwjs.com"))
+        // "escort" is a whole-label token: escortedtours.com (travel) stays up.
+        assertFalse(blocklist.contains("escortedtours.com"))
+        assertFalse(blocklist.contains("escort-agency-list.gov"))
+        // "sexy" whole-label only: sexyhair.com (salon brand) stays up.
+        assertFalse(blocklist.contains("sexyhair.com"))
+        assertFalse(blocklist.contains("github.com"))
+        assertFalse(blocklist.contains("stackoverflow.com"))
+        assertFalse(blocklist.contains("wikipedia.org"))
     }
 
     @Test

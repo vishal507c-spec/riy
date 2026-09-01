@@ -7,8 +7,10 @@ import android.os.Build
 import android.view.ViewGroup
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.vishal.riy.blocker.WebContentFilter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,6 +53,7 @@ import com.vishal.riy.blocker.Blocklist
 
 private val TEST_SITES = listOf(
     "https://www.google.com/search?q=porn" to "Google explicit search (SafeSearch check)",
+    "https://www.google.com/search?q=porn&tbm=isch" to "Google Images explicit (SafeSearch check)",
     "https://www.pornhub.com/" to "Pornhub (adult site)",
     "https://www.xvideos.com/" to "XVideos (adult site)",
     "https://www.wikipedia.org/" to "Wikipedia (normal site)",
@@ -84,6 +88,7 @@ fun ProtectionTestScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var target by remember { mutableStateOf<String?>(null) }
     var result by remember { mutableStateOf<TestResult?>(null) }
+    var blockedAssets by remember { mutableIntStateOf(0) }
 
     val webView = remember {
         WebView(context).apply {
@@ -98,6 +103,7 @@ fun ProtectionTestScreen(onBack: () -> Unit) {
                     // First definitive result wins; later duplicates are ignored.
                     if (result is TestResult.Running || result == null) result = testResult
                 },
+                onAssetBlocked = { blockedAssets++ },
             )
         }
     }
@@ -109,6 +115,7 @@ fun ProtectionTestScreen(onBack: () -> Unit) {
         target == null -> SitePicker(
             onPick = { url ->
                 result = TestResult.Running
+                blockedAssets = 0
                 target = url
             },
             onBack = onBack,
@@ -118,6 +125,7 @@ fun ProtectionTestScreen(onBack: () -> Unit) {
             webView = webView,
             target = target ?: "",
             result = result,
+            blockedAssets = blockedAssets,
             onLoad = { url -> webView.loadUrl(url) },
             onBackToPicker = {
                 webView.stopLoading()
@@ -132,7 +140,59 @@ fun ProtectionTestScreen(onBack: () -> Unit) {
 
 private class TestWebViewClient(
     private val onResult: (TestResult) -> Unit,
+    private val onAssetBlocked: () -> Unit,
 ) : WebViewClient() {
+
+    private val filterBlocklist = Blocklist(
+        listOf(
+            "pornhub.com", "xvideos.com", "xhamster.com", "onlyfans.com",
+            "scrolller.com", "redgifs.com", "chaturbate.com", "stripchat.com",
+        ),
+    )
+
+    /**
+     * URL-level content classification for every resource (images, scripts,
+     * frames) loaded inside the app's WebView: adult hosts and explicit-URL
+     * assets are dropped WITHOUT any TLS interception.
+     */
+    override fun shouldInterceptRequest(
+        view: WebView?,
+        request: WebResourceRequest?,
+    ): WebResourceResponse? {
+        request ?: return null
+        val url = request.url
+        val decision = WebContentFilter.decide(url.host, url.toString(), filterBlocklist)
+        if (decision == WebContentFilter.Decision.ALLOW) return null
+        if (request.isForMainFrame) {
+            // Initial navigation blocked by the in-app filter (e.g. when the
+            // DNS layer was bypassed) — report it as a blocked result too.
+            onResult(TestResult.Blocked(url.toString(), "blocked by Riy in-app filter"))
+        } else {
+            onAssetBlocked()
+        }
+        val html = if (request.isForMainFrame) {
+            "<html><body style='background:#1b1b1b;color:#fff;font-family:sans-serif;" +
+                "display:flex;align-items:center;justify-content:center;height:100%'>" +
+                "<h3>Content Blocked</h3></body></html>"
+        } else {
+            ""
+        }
+        return WebResourceResponse(
+            "text/html", "utf-8", 403, "Blocked by Riy Protection",
+            mapOf("Cache-Control" to "no-store"),
+            html.byteInputStream(),
+        )
+    }
+
+    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+        val url = request?.url ?: return false
+        val decision = WebContentFilter.decide(url.host, url.toString(), filterBlocklist)
+        if (decision != WebContentFilter.Decision.ALLOW) {
+            onResult(TestResult.Blocked(url.toString(), "blocked by Riy in-app filter"))
+            return true
+        }
+        return false
+    }
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
         onResult(TestResult.Running)
@@ -231,6 +291,7 @@ private fun TestRunView(
     webView: WebView,
     target: String,
     result: TestResult?,
+    blockedAssets: Int,
     onLoad: (String) -> Unit,
     onBackToPicker: () -> Unit,
     onBack: () -> Unit,
@@ -285,6 +346,14 @@ private fun TestRunView(
                             text = (result as TestResult.Failed).detail,
                             style = typography.bodySmall,
                             color = colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (blockedAssets > 0) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(R.string.test_assets_blocked, blockedAssets),
+                            style = typography.bodySmall,
+                            color = colorScheme.error,
                         )
                     }
                     Spacer(Modifier.height(8.dp))

@@ -61,10 +61,23 @@ class Blocklist(rules: List<String> = emptyList()) {
 
     companion object {
         internal val ADULT_TLDS = setOf("xxx", "adult", "porn", "sex", "sexy")
-        // Substring keywords: no common innocent domain contains these.
-        internal val SUBSTRING_KEYWORDS = listOf("porn", "hentai", "xnxx", "xvideos")
+        // Substring keywords on the FULL host. Every entry is an adult-only
+        // brand name — no common innocent domain contains any of them, so
+        // mirrors like xvideos.io / chaturbate.asia are caught automatically.
+        internal val SUBSTRING_KEYWORDS = listOf(
+            "porn", "hentai", "xnxx", "xvideos", "xhamster", "redtube",
+            "chaturbate", "stripchat", "bongacams", "camsoda", "livejasmin",
+            "myfreecams", "spankbang", "spankwire", "onlyfans", "fansly",
+            "imagefap", "motherless", "eporner", "tnaflix", "brazzers",
+            "bangbros", "realitykings", "naughtyamerica", "teamskeet",
+            "digitalplayground", "missav", "jable", "rule34", "redgifs",
+            "erome", "fapello", "hitomi", "gelbooru",
+        )
+        // WHOLE-LABEL tokens of the registrable part: nsfw.example.com is
+        // blocked while nsfwjs.com (ML library) stays allowed.
         internal val TOKEN_LABELS = setOf(
             "porn", "sex", "xxx", "adult", "hentai", "nude", "nudes",
+            "nsfw", "sexy", "boobs", "erotic", "escort", "horny",
         )
 
         fun normalizeDomain(domain: String): String =
