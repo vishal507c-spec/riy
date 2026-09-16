@@ -21,6 +21,20 @@
     <string name="action_back">Back</string>
     <string name="action_back_to_tests">Back to tests</string>
 
+    <!-- Protected browser -->
+    <string name="browser_tab">Browser</string>
+    <string name="protection_tab">Protection</string>
+    <string name="browser_address_hint">Search or type a URL</string>
+    <string name="browser_content_back">Back</string>
+    <string name="browser_content_forward">Forward</string>
+    <string name="browser_content_refresh">Refresh</string>
+    <string name="browser_content_home">Home</string>
+    <string name="browser_content_menu">More</string>
+    <string name="browser_set_default">Set as default browser</string>
+    <string name="browser_open_protection">Protection settings</string>
+    <string name="browser_assets_blocked">%1$d adult image(s) blocked on this page</string>
+    <string name="action_open_browser">Open Protected Browser</string>
+
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="settings_info_lines">• Protection keeps running in the background and is restored after reboot.\n• Google, Bing, DuckDuckGo, Yandex SafeSearch and YouTube Restricted mode are enforced at DNS level — they cannot be turned off from browser/app settings while protection is ON.\n• For maximum reliability, turn on “Always-On VPN” for Riy in Android VPN settings.\n• Only DNS traffic is filtered — nothing is decrypted or inspected.</string>
@@ -41,8 +55,11 @@
     <string name="blocked_overlay_icon">✕</string>
     <string name="blocked_overlay_title">Content Blocked</string>
     <string name="adult_search_blocked_title">Adult Search Blocked</string>
+    <string name="adult_search_blocked_message">Protected browsing is enabled.</string>
+    <string name="adult_search_blocked_detail">Adult search queries are blocked before their results load, and explicit imagery is removed from pages.</string>
     <string name="blocked_overlay_message">This site may contain adult content and is blocked by Riy Protection. If you believe this is a mistake, close this page.</string>
     <string name="blocked_overlay_close">Close</string>
+    <string name="blocked_action_home">Go Home</string>
 
     <!-- VPN service -->
     <string name="blocker_vpn_session">Riy Adult Content Filter</string>
@@ -62,4 +79,25 @@
     <string name="update_install_permission_title">Permission needed</string>
     <string name="update_install_permission_message">Allow installing apps from this source to complete the update. After granting the permission, tap “Update Now” again.</string>
     <string name="update_retry">Retry</string>
+
+    <!-- Awareness + progressive lock -->
+    <string name="trigger_sheet_title">Kya feel ho raha hai?</string>
+    <string name="trigger_sheet_subtitle">Optional — sirf tumhari pattern samajhne ke liye. Skip kar sakte ho.</string>
+    <string name="trigger_skip">Skip</string>
+    <string name="trigger_boredom">Boredom</string>
+    <string name="trigger_stress">Stress</string>
+    <string name="trigger_loneliness">Loneliness</string>
+    <string name="trigger_habit">Habit</string>
+    <string name="trigger_late_night">Late Night</string>
+    <string name="trigger_other">Other</string>
+    <string name="lock_protection_active">Protection Active</string>
+    <string name="lock_remaining">Remaining: %1$s</string>
+    <string name="progress_title">Progress</string>
+    <string name="progress_avoided">Adult searches avoided</string>
+    <string name="progress_pauses">Awareness pauses completed</string>
+    <string name="progress_protection">Current protection</string>
+    <string name="progress_protection_locked">Locked</string>
+    <string name="progress_protection_open">Open</string>
+    <string name="progress_trigger">Most common trigger (past 7 days)</string>
+    <string name="progress_trigger_none">—</string>
 </resources>

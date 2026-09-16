@@ -1,9 +1,13 @@
 package com.vishal.riy
 
 import android.os.Bundle
+import android.content.Intent
 import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
@@ -37,14 +41,30 @@ class MainActivity : AppCompatActivity() {
     private var updateDialogShown = false
     private var resumeObserver: LifecycleEventObserver? = null
 
+    /**
+     * http/https URL the system asked riy to open (default-browser intent).
+     * Cleared once the browser has consumed it. Observed by [RiyApp].
+     */
+    private var externalUrl by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        externalUrl = intent?.dataString?.takeIf { it.isNotBlank() }
         setContent {
-            RiyApp()
+            RiyApp(
+                externalUrl = externalUrl,
+                onExternalUrlHandled = { externalUrl = null },
+            )
         }
         updatePreferences = UpdatePreferences(this)
         scheduleUpdateCheck()
         restoreProtectionIfInterrupted()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // A link tap while riy is already open: hand it to the browser.
+        externalUrl = intent.dataString?.takeIf { it.isNotBlank() }
     }
 
     override fun onStart() {

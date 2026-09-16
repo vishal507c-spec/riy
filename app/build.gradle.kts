@@ -78,6 +78,7 @@ android {
         // so the Int cast is always safe.
         versionCode = computedVersionCode.toInt()
         versionName = computedVersionName
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -152,6 +153,8 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
+    // Extended icon set (Public / Security / Shield used by the app UI).
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
@@ -163,4 +166,14 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     // org.json ships with Android; this copy is only for local JVM unit tests.
     testImplementation("org.json:json:20240303")
+
+    // On-device instrumented tests (real WebView + real Compose UI on a
+    // device/emulator): these verify that adult search requests are answered
+    // locally — before any results page is fetched — and that the blocked
+    // screen appears.
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation(platform(composeBom))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

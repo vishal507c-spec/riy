@@ -26,6 +26,19 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Lets the user choose riy as the DEFAULT BROWSER (Android asks
+                 per link-tap or via Settings). Matching http/https VIEW
+                 intents open inside riy's own protected WebView, where the
+                 search-query / host / image-classifier layers can act on the
+                 URL. Chrome is never modified, disabled or uninstalled — the
+                 user simply picks riy. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+            </intent-filter>
         </activity>
 
         <!-- DNS-filtering VPN service. Only the system (which holds

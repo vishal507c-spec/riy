@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vishal.riy.BuildConfig
 import com.vishal.riy.R
+import com.vishal.riy.awareness.AwarenessSnapshot
 import com.vishal.riy.blocker.BlockerState
 
 /**
@@ -53,6 +54,9 @@ import com.vishal.riy.blocker.BlockerState
 @Composable
 fun ProtectionScreen(
     onOpenProtectionTest: () -> Unit,
+    onOpenBrowser: () -> Unit,
+    awarenessSnapshot: AwarenessSnapshot? = null,
+    modifier: Modifier = Modifier,
     viewModel: ProtectionViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -73,7 +77,7 @@ fun ProtectionScreen(
     ) { }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
@@ -102,7 +106,19 @@ fun ProtectionScreen(
             color = colorScheme.onSurfaceVariant,
         )
 
+        // Minimal awareness/progress metrics (no streaks, no shaming).
+        awarenessSnapshot?.let { snapshot ->
+            AwarenessProgressSection(snapshot)
+        }
+
         Spacer(Modifier.height(4.dp))
+
+        Button(
+            onClick = onOpenBrowser,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.action_open_browser))
+        }
 
         Button(
             onClick = {

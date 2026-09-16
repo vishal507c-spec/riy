@@ -1,18 +1,9 @@
 package com.vishal.riy.ui
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Build
 import android.view.ViewGroup
-import android.webkit.WebResourceError
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebView
-import android.webkit.WebViewClient
-import com.vishal.riy.blocker.ImageClassifier
-import com.vishal.riy.blocker.SearchKeywordPolicy
-import com.vishal.riy.blocker.WebContentFilter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,9 +43,9 @@ import androidx.compose.ui.zIndex
 import com.vishal.riy.R
 import com.vishal.riy.blocker.BlockerState
 import com.vishal.riy.blocker.Blocklist
+import com.vishal.riy.blocker.ProtectedWebViewClient
 
-private val TEST_SITES = listOf(
-    "https://www.google.com/search?q=hot+photo" to "Adult search block check: 'hot photo' (Google)",
+private val TEST_SITES = listOf(    "https://www.google.com/search?q=hot+photo" to "Adult search block check: 'hot photo' (Google)",
     "https://www.bing.com/search?q=sexy+photo" to "Adult search block check: 'sexy photo' (Bing)",
     "https://www.google.com/search?q=adult+education" to "Allow check: 'adult education' (Google)",
     "https://www.google.com/search?q=hot+photo&tbm=isch" to "Google Images 'hot photo' (classifier check)",
@@ -81,6 +72,18 @@ private val DNS_BLOCK_ERRORS = listOf(
     "ERR_NAME_RESOLUTION_FAILED",
 )
 
+/**
+ * Hosts the in-app filter is asked to recognise during tests. Deliberately a
+ * SMALL subset so that a direct load of an adult site is stopped by the DNS
+ * layer (the honest thing under test) rather than pre-empted in-app.
+ */
+private val TEST_BLOCKLIST = Blocklist(
+    listOf(
+        "pornhub.com", "xvideos.com", "xhamster.com", "onlyfans.com",
+        "scrolller.com", "redgifs.com", "chaturbate.com", "stripchat.com",
+    ),
+)
+
 private sealed interface TestResult {
     data object Running : TestResult
     data class Blocked(val url: String, val detail: String) : TestResult
@@ -97,11 +100,10 @@ private sealed interface TestResult {
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun ProtectionTestScreen(onBack: () -> Unit) {
+fun ProtectionTestScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var target by remember { mutableStateOf<String?>(null) }
-    var result by remember { mutableStateOf<TestResult?>(null) }
-    var blockedAssets by remember { mutableIntStateOf(0) }
+    val testState = remember { TestRunState() }
 
     val webView = remember {
         WebView(context).apply {
@@ -111,263 +113,122 @@ fun ProtectionTestScreen(onBack: () -> Unit) {
             )
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
-            webViewClient = TestWebViewClient(
-                onResult = { testResult ->
-                    // First definitive result wins; later duplicates are ignored.
-                    if (result is TestResult.Running || result == null) result = testResult
-                },
-                onAssetBlocked = { blockedAssets++ },
+            // The full protection pipeline (search-keyword / host / image
+            // classifier). blockMainFrameHosts = false keeps this an HONEST
+            // test: an adult site loaded directly must be stopped by the DNS
+            // layer, not by the in-app URL filter.
+            webViewClient = ProtectedWebViewClient(
+                blocklist = TEST_BLOCKLIST,
+                blockMainFrameHosts = false,
+                onEvent = testState::handleEvent,
             )
         }
     }
-    DisposableEffect(Unit) {
-        onDispose { webView.destroy() }
-    }
+    DisposableEffect(Unit) { onDispose { webView.destroy() } }
 
     when {
         target == null -> SitePicker(
             onPick = { url ->
-                result = TestResult.Running
-                blockedAssets = 0
+                testState.reset()
+                testState.submit(TestResult.Running)
                 target = url
             },
             onBack = onBack,
+            modifier = modifier,
         )
 
         else -> TestRunView(
             webView = webView,
             target = target ?: "",
-            result = result,
-            blockedAssets = blockedAssets,
+            result = testState.result,
+            blockedAssets = testState.blockedAssets,
             onLoad = { url -> webView.loadUrl(url) },
             onBackToPicker = {
                 webView.stopLoading()
                 webView.loadUrl("about:blank")
                 target = null
-                result = null
+                testState.reset()
             },
             onBack = onBack,
+            modifier = modifier,
         )
     }
 }
 
-private class TestWebViewClient(
-    private val onResult: (TestResult) -> Unit,
-    private val onAssetBlocked: () -> Unit,
-) : WebViewClient() {
+/**
+ * Holds the live result of the running protection test and maps
+ * protection-pipeline events into honest outcomes. The FIRST definitive
+ * result wins; later duplicates for the same run are ignored.
+ */
+private class TestRunState {
+    var result by mutableStateOf<TestResult?>(null)
+        private set
+    var blockedAssets by mutableIntStateOf(0)
+        private set
 
-    private val filterBlocklist = Blocklist(
-        listOf(
-            "pornhub.com", "xvideos.com", "xhamster.com", "onlyfans.com",
-            "scrolller.com", "redgifs.com", "chaturbate.com", "stripchat.com",
-        ),
-    )
-
-    /**
-     * True while the current page is an image-SEARCH result page (Google
-     * Images etc.): there the user explicitly asked a search engine for
-     * images, so the strict NSFW threshold applies.
-     */
-    @Volatile private var strictImageSearchPage = false
-
-    private fun isImageSearchPage(url: android.net.Uri): Boolean {
-        val host = url.host ?: return false
-        val isGoogle = host == "www.google.com" || host.endsWith(".google.com")
-        if (!isGoogle) return false
-        val query = url.query ?: return false
-        return query.contains("tbm=isch") || query.contains("udm=2")
+    fun reset() {
+        result = null
+        blockedAssets = 0
     }
 
-    /**
-     * Content filtering for every resource loaded inside the app's WebView:
-     *  1. Adult hosts / explicit-URL assets -> dropped (no TLS inspection).
-     *  2. Image subresources -> bytes are fetched and classified ON-DEVICE
-     *     (Yahoo OpenNSFW TFLite): explicit imagery is replaced by a blocked
-     *     placeholder; safe images are returned unchanged.
-     *  3. On image-search result pages the STRICT threshold applies, catching
-     *     the "highly suggestive but non-explicit" band Google SafeSearch
-     *     leaves visible ("hot photo" / "sexy photo" results).
-     */
-    override fun shouldInterceptRequest(
-        view: WebView?,
-        request: WebResourceRequest?,
-    ): WebResourceResponse? {
-        request ?: return null
-        val url = request.url
-        if (request.isForMainFrame) {
-            strictImageSearchPage = isImageSearchPage(url)
-            // Adult search-keyword layer: block the RESULTS REQUEST itself
-            // (the network fetch never happens) before any other check.
-            if (SearchKeywordPolicy.evaluate(url.toString()) ==
-                SearchKeywordPolicy.Decision.BLOCK_ADULT_QUERY
-            ) {
-                onResult(TestResult.Blocked(url.toString(), "adult search query blocked"))
-                return adultSearchBlockedResponse()
-            }
-            return null
-        }
-        val decision = WebContentFilter.decide(url.host, url.toString(), filterBlocklist)
-        if (decision != WebContentFilter.Decision.ALLOW) {
-            onAssetBlocked()
-            return blockedResponse(mainFrame = false)
-        }
-        if (!isImageResource(url.toString())) return null
-
-        ImageClassifier.ensureInit(view?.context ?: return null)
-        val bytes = fetchImage(url.toString()) ?: return null
-        val nsfw = ImageClassifier.classify(url.toString(), bytes, strictImageSearchPage)
-        if (nsfw) {
-            onAssetBlocked()
-            return blockedResponse(mainFrame = false)
-        }
-        val contentType = guessContentType(url.toString())
-        return WebResourceResponse(contentType, null, bytes.inputStream())
+    fun submit(testResult: TestResult) {
+        if (result is TestResult.Running || result == null) result = testResult
     }
 
-    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-        val url = request?.url ?: return false
-        if (SearchKeywordPolicy.evaluate(url.toString()) ==
-            SearchKeywordPolicy.Decision.BLOCK_ADULT_QUERY
-        ) {
-            onResult(TestResult.Blocked(url.toString(), "adult search query blocked"))
-            return true
-        }
-        val decision = WebContentFilter.decide(url.host, url.toString(), filterBlocklist)
-        if (decision != WebContentFilter.Decision.ALLOW) {
-            onResult(TestResult.Blocked(url.toString(), "blocked by Riy in-app filter"))
-            return true
-        }
-        return false
-    }
+    /** ProtectionEvent -> TestResult, mirroring the documented test contract. */
+    fun handleEvent(event: ProtectedWebViewClient.ProtectionEvent) {
+        when (event) {
+            is ProtectedWebViewClient.ProtectionEvent.PageStarted ->
+                submit(TestResult.Running)
 
-    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-        onResult(TestResult.Running)
-        super.onPageStarted(view, url, favicon)
-    }
+            is ProtectedWebViewClient.ProtectionEvent.PageFinished ->
+                if (event.url != "about:blank") submit(TestResult.Loaded(event.url))
 
-    override fun onReceivedError(
-        view: WebView?,
-        request: WebResourceRequest?,
-        error: WebResourceError?,
-    ) {
-        if (request == null || !request.isForMainFrame || error == null) return
-        val host = Uri.parse(request.url.toString()).host ?: return
-        val description = error.description?.toString().orEmpty()
-        val errorCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) error.errorCode else -1
-        if (BlocklistTestHelper.isAdult(host)) {
-            if (DNS_BLOCK_ERRORS.any { description.contains(it) } || errorCode == -2) {
-                // -2 = ERROR_HOST_LOOKUP (classic DNS failure signature)
-                onResult(TestResult.Blocked(request.url.toString(), description))
-            } else {
-                onResult(TestResult.Failed(request.url.toString(), "$description (code $errorCode)"))
-            }
-        } else {
-            onResult(
-                TestResult.Failed(request.url.toString(), description.ifEmpty { "load error $errorCode" }),
-            )
-        }
-        super.onReceivedError(view, request, error)
-    }
-
-    override fun onPageFinished(view: WebView?, url: String?) {
-        super.onPageFinished(view, url)
-        val current = url ?: return
-        if (current == "about:blank") return
-        val host = Uri.parse(current).host ?: return
-        // Only report Loaded if no error already arrived for this navigation;
-        // onResult() ignores this when the result is already Blocked/Failed.
-        onResult(TestResult.Loaded(current))
-    }
-}
-
-    /** Test hosts are classified by the same matching logic as the filter. */
-    private object BlocklistTestHelper {
-        private val blocklist = Blocklist(listOf("pornhub.com", "xvideos.com"))
-
-        fun isAdult(host: String): Boolean = blocklist.contains(host)
-    }
-
-    private fun blockedResponse(mainFrame: Boolean): WebResourceResponse {
-        val body = if (mainFrame) {
-            "<html><body style='background:#1b1b1b;color:#fff;font-family:sans-serif;" +
-                "display:flex;align-items:center;justify-content:center;height:100%'>" +
-                "<h3>Content Blocked</h3></body></html>"
-        } else {
-            ""
-        }
-        return WebResourceResponse(
-            "text/html", "utf-8", 403, "Blocked by Riy Protection",
-            mapOf("Cache-Control" to "no-store"),
-            body.byteInputStream(),
-        )
-    }
-
-    /** "Adult Search Blocked" page served instead of the search results. */
-    private fun adultSearchBlockedResponse(): WebResourceResponse {
-        val body = "<html><body style='background:#1b1b1b;color:#fff;font-family:sans-serif;" +
-            "display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%'>" +
-            "<h2>Adult Search Blocked</h2>" +
-            "<p style='color:#aaa'>This search query was blocked by Riy Protection.</p>" +
-            "</body></html>"
-        return WebResourceResponse(
-            "text/html", "utf-8", 403, "Blocked by Riy Protection",
-            mapOf("Cache-Control" to "no-store"),
-            body.byteInputStream(),
-        )
-    }
-
-    private fun isImageResource(url: String): Boolean {
-        val path = url.substringBefore('?').lowercase()
-        if (path.endsWith(".jpg") || path.endsWith(".jpeg") || path.endsWith(".png") ||
-            path.endsWith(".webp") || path.endsWith(".gif")
-        ) {
-            return true
-        }
-        // googleusercontent-style thumbnail hosts have no file extension.
-        val host = Uri.parse(url).host ?: return false
-        return host.contains("googleusercontent") || host.contains("gstatic")
-    }
-
-    /** Fetches image bytes for classification (bounded, on the WebView IO thread). */
-    private fun fetchImage(url: String): ByteArray? {
-        return try {
-            val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-            try {
-                connection.connectTimeout = 6000
-                connection.readTimeout = 6000
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) RiyFilter")
-                if (connection.responseCode != 200) return null
-                val input = connection.inputStream
-                val out = java.io.ByteArrayOutputStream()
-                val buffer = ByteArray(16 * 1024)
-                var read: Int
-                while (input.read(buffer).also { read = it } != -1) {
-                    out.write(buffer, 0, read)
-                    if (out.size() > ImageClassifier.MAX_BYTES) return null
+            is ProtectedWebViewClient.ProtectionEvent.PageError -> {
+                val host = Uri.parse(event.url).host ?: return
+                if (BlocklistTestHelper.isAdult(host)) {
+                    if (DNS_BLOCK_ERRORS.any { event.description.contains(it) } || event.errorCode == -2) {
+                        // -2 = ERROR_HOST_LOOKUP (classic DNS-failure signature)
+                        submit(TestResult.Blocked(event.url, event.description))
+                    } else {
+                        submit(TestResult.Failed(event.url, "${event.description} (code ${event.errorCode})"))
+                    }
+                } else {
+                    submit(
+                        TestResult.Failed(
+                            event.url,
+                            event.description.ifEmpty { "load error ${event.errorCode}" },
+                        ),
+                    )
                 }
-                out.toByteArray()
-            } finally {
-                connection.disconnect()
             }
-        } catch (_: Exception) {
-            null // fail-open: unreachable image stays visible rather than breaking the page
-        }
-    }
 
-    private fun guessContentType(url: String): String {
-        val path = url.substringBefore('?').lowercase()
-        return when {
-            path.endsWith(".png") -> "image/png"
-            path.endsWith(".webp") -> "image/webp"
-            path.endsWith(".gif") -> "image/gif"
-            else -> "image/jpeg"
+            is ProtectedWebViewClient.ProtectionEvent.AdultSearchBlocked ->
+                submit(TestResult.Blocked(event.url, "adult search query blocked"))
+
+            is ProtectedWebViewClient.ProtectionEvent.HostBlocked ->
+                submit(TestResult.Blocked(event.url, "blocked by Riy in-app filter"))
+
+            is ProtectedWebViewClient.ProtectionEvent.AssetBlocked -> blockedAssets++
         }
     }
+}
+
+/** Test hosts are classified by the same matching logic as the filter. */
+private object BlocklistTestHelper {
+    private val blocklist = Blocklist(listOf("pornhub.com", "xvideos.com"))
+
+    fun isAdult(host: String): Boolean = blocklist.contains(host)
+}
 
 @Composable
-private fun SitePicker(onPick: (String) -> Unit, onBack: () -> Unit) {
+private fun SitePicker(
+    onPick: (String) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
@@ -418,10 +279,11 @@ private fun TestRunView(
     onLoad: (String) -> Unit,
     onBackToPicker: () -> Unit,
     onBack: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(target) { if (target.isNotBlank()) onLoad(target) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { webView },
