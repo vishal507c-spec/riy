@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Single source of truth for the REAL protection state. The VPN service
- * reports transitions through [update]; the Compose UI observes [state].
+ * reports transitions through [update]; the Compose UI observes [Snapshot].
  * The UI never sets the phase directly, so a fake "Protection ON" is
  * impossible.
  */
@@ -26,7 +26,6 @@ object BlockerState {
 
     data class Snapshot(
         val phase: Phase = Phase.OFF,
-        val blockedCount: Long = 0L,
         val failureReason: String? = null,
     )
 
@@ -36,16 +35,6 @@ object BlockerState {
     fun current(): Snapshot = snapshot.get()
 
     fun update(phase: Phase, failureReason: String? = null) {
-        val next = Snapshot(phase, snapshot.get().blockedCount, failureReason)
-        snapshot.set(next)
-    }
-
-    /** Called by the service on every blocked DNS query. */
-    fun incrementBlocked() {
-        while (true) {
-            val cur = snapshot.get()
-            val next = cur.copy(blockedCount = cur.blockedCount + 1)
-            if (snapshot.compareAndSet(cur, next)) return
-        }
+        snapshot.set(Snapshot(phase, failureReason))
     }
 }

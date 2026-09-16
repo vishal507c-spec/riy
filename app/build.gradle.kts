@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,7 +5,7 @@ plugins {
 }
 
 /**
- * Versioning strategy (mirrors com.vishal.riy.update.VersionUtils — keep in sync):
+ * Versioning strategy:
  *
  *   versionCode = major * 1_000_000 + minor * 1_000 + patch
  *
@@ -31,35 +29,6 @@ fun versionNameFromTag(tag: String?): String = tag?.trim()?.removePrefix("v")?.r
 val releaseTag: String? = (project.findProperty("versionTag") as String?)?.trim()?.takeIf { it.isNotBlank() }
 val computedVersionName = versionNameFromTag(releaseTag)
 val computedVersionCode = versionCodeFromTag(releaseTag)
-
-/**
- * Fine-grained GitHub PAT for reading the PRIVATE repository releases + assets.
- * Loaded ONLY from LOCAL config (never committed / never hard-coded):
- *   1. env var GITHUB_TOKEN
- *   2. Gradle property GITHUB_TOKEN (gradle.properties or -P)
- *   3. local.properties key GITHUB_TOKEN (gitignored, most convenient)
- * Returns "" when not configured, so RELEASE builds carry NO token. Only DEBUG
- * builds embed it (local test builds only) — never a production artifact.
- */
-fun githubToken(): String {
-    val env = System.getenv("GITHUB_TOKEN")
-    if (!env.isNullOrBlank()) return env.trim()
-    val prop = (project.findProperty("GITHUB_TOKEN") as String?)?.takeIf { it.isNotBlank() }
-    if (prop != null) return prop.trim()
-    val localFile = rootProject.file("local.properties")
-    if (localFile.exists()) {
-        val props = Properties()
-        localFile.inputStream().use { props.load(it) }
-        val fromFile = props.getProperty("GITHUB_TOKEN")?.takeIf { it.isNotBlank() }
-        if (fromFile != null) return fromFile.trim()
-    }
-    return ""
-}
-
-fun escapeForJavaString(s: String): String =
-    s.replace("\\", "\\\\").replace("\"", "\\\"")
-
-val gitHubToken: String = githubToken()
 
 android {
     namespace = "com.vishal.riy"
@@ -107,8 +76,6 @@ android {
 
     buildTypes {
         debug {
-            // Token injected ONLY into local DEBUG builds; never in release.
-            buildConfigField("String", "GITHUB_TOKEN", "\"${escapeForJavaString(gitHubToken)}\"")
             // Use the SAME repository-controlled signing identity as release so local
             // debug APKs and CI release APKs share one deterministic certificate.
             // This never falls back to the machine-specific ~/.android/debug.keystore,
@@ -117,10 +84,6 @@ android {
         }
         release {
             isMinifyEnabled = false
-            // Release artifacts also carry the token (same local.config mechanism as
-            // debug) so the app can self-update from the PRIVATE GitHub repository.
-            // The user accepts the PAT being extractable from the APK; no backend.
-            buildConfigField("String", "GITHUB_TOKEN", "\"${escapeForJavaString(gitHubToken)}\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("releaseFallback")
         }
@@ -158,19 +121,12 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    // On-device NSFW image classifier (Yahoo OpenNSFW TFLite port), used by
-    // the in-app WebView content filter. Bundled model: assets/nsfw.tflite.
-    implementation("io.github.devzwy:nsfw:1.5.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")
-    // org.json ships with Android; this copy is only for local JVM unit tests.
-    testImplementation("org.json:json:20240303")
 
-    // On-device instrumented tests (real WebView + real Compose UI on a
-    // device/emulator): these verify that adult search requests are answered
-    // locally — before any results page is fetched — and that the blocked
-    // screen appears.
+    // On-device instrumented tests (real Compose UI on a device/emulator):
+    // these verify that the lock screen appears and cannot be backed out of.
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation(platform(composeBom))

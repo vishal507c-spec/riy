@@ -1,65 +1,22 @@
 <resources>
     <string name="app_name">Riy</string>
     <string name="app_version_label">Version %1$s</string>
-    <string name="app_tagline">Adult content blocker</string>
+
+    <!-- Shield glyph used by the protection + lock screens. -->
+    <string name="app_shield">🛡️</string>
 
     <!-- Protection status (always the REAL service state) -->
-    <string name="status_protection_on">Protection ON</string>
-    <string name="status_protection_off">Protection OFF</string>
+    <string name="status_protection_on">Porn Protection ON</string>
+    <string name="status_protection_off">Porn Protection OFF</string>
     <string name="status_connecting">Starting protection…</string>
     <string name="status_protection_failed">Protection FAILED</string>
-    <string name="status_detail_active">VPN filter is active. Adult sites are blocked system-wide and Google SafeSearch is enforced.</string>
+    <string name="status_detail_active">Adult sites are blocked system-wide and search-engine SafeSearch is enforced at DNS level.</string>
     <string name="status_detail_connecting">Activating the VPN filter…</string>
     <string name="status_detail_failed">The filter could not start (VPN permission revoked or another VPN is active). Tap Enable Protection to retry.</string>
     <string name="status_detail_off">No filtering is running right now.</string>
-    <string name="blocked_counter_label">Blocked attempts: %1$d</string>
 
     <!-- Actions -->
     <string name="action_enable_protection">Enable Protection</string>
-    <string name="action_disable_protection">Disable Protection</string>
-    <string name="action_test_protection">Check / Test Protection</string>
-    <string name="action_back">Back</string>
-    <string name="action_back_to_tests">Back to tests</string>
-
-    <!-- Protected browser -->
-    <string name="browser_tab">Browser</string>
-    <string name="protection_tab">Protection</string>
-    <string name="browser_address_hint">Search or type a URL</string>
-    <string name="browser_content_back">Back</string>
-    <string name="browser_content_forward">Forward</string>
-    <string name="browser_content_refresh">Refresh</string>
-    <string name="browser_content_home">Home</string>
-    <string name="browser_content_menu">More</string>
-    <string name="browser_set_default">Set as default browser</string>
-    <string name="browser_open_protection">Protection settings</string>
-    <string name="browser_assets_blocked">%1$d adult image(s) blocked on this page</string>
-    <string name="action_open_browser">Open Protected Browser</string>
-
-    <!-- Settings -->
-    <string name="settings_title">Settings</string>
-    <string name="settings_info_lines">• Protection keeps running in the background and is restored after reboot.\n• Google, Bing, DuckDuckGo, Yandex SafeSearch and YouTube Restricted mode are enforced at DNS level — they cannot be turned off from browser/app settings while protection is ON.\n• For maximum reliability, turn on “Always-On VPN” for Riy in Android VPN settings.\n• Only DNS traffic is filtered — nothing is decrypted or inspected.</string>
-    <string name="settings_open_vpn">Open Android VPN settings</string>
-
-    <!-- Protection test -->
-    <string name="test_title">Protection Test</string>
-    <string name="test_description">Open a known adult site and a normal site inside this app. If protection is active, the adult site will show the blocked screen; the normal site will load normally.</string>
-    <string name="test_status_on">Protection is ON — adult sites should show “Content Blocked”.</string>
-    <string name="test_status_off">Protection is OFF — adult sites will load. Enable protection first for a valid test.</string>
-    <string name="test_loading">Loading…</string>
-    <string name="test_assets_blocked">%1$d adult assets blocked by the in-app filter</string>
-    <string name="test_result_allowed">Loaded OK — normal websites work.</string>
-    <string name="test_result_not_blocked">WARNING: this adult site LOADED — protection is not blocking it!</string>
-    <string name="test_result_load_error">Site did not load (network error).</string>
-
-    <!-- Blocked screen -->
-    <string name="blocked_overlay_icon">✕</string>
-    <string name="blocked_overlay_title">Content Blocked</string>
-    <string name="adult_search_blocked_title">Adult Search Blocked</string>
-    <string name="adult_search_blocked_message">Protected browsing is enabled.</string>
-    <string name="adult_search_blocked_detail">Adult search queries are blocked before their results load, and explicit imagery is removed from pages.</string>
-    <string name="blocked_overlay_message">This site may contain adult content and is blocked by Riy Protection. If you believe this is a mistake, close this page.</string>
-    <string name="blocked_overlay_close">Close</string>
-    <string name="blocked_action_home">Go Home</string>
 
     <!-- VPN service -->
     <string name="blocker_vpn_session">Riy Adult Content Filter</string>
@@ -67,37 +24,9 @@
     <string name="blocker_notification_title">Protection is ON</string>
     <string name="blocker_notification_text">Adult websites are being blocked</string>
 
-    <!-- Update dialog -->
-    <string name="update_title">New Update Available</string>
-    <string name="update_message">A newer version of the app is available.\n\nCurrent version: %1$s\nLatest version: %2$s</string>
-    <string name="update_action_now">Update Now</string>
-    <string name="update_action_later">Later</string>
-    <string name="update_downloading">Downloading update… %1$d%%</string>
-    <string name="update_installing">Download complete. Starting installation…</string>
-    <string name="update_failed">Update download failed. Please try again later.</string>
-    <string name="update_verification_failed">Downloaded file failed verification. Installation cancelled for your safety.</string>
-    <string name="update_install_permission_title">Permission needed</string>
-    <string name="update_install_permission_message">Allow installing apps from this source to complete the update. After granting the permission, tap “Update Now” again.</string>
-    <string name="update_retry">Retry</string>
-
-    <!-- Awareness + progressive lock -->
-    <string name="trigger_sheet_title">Kya feel ho raha hai?</string>
-    <string name="trigger_sheet_subtitle">Optional — sirf tumhari pattern samajhne ke liye. Skip kar sakte ho.</string>
-    <string name="trigger_skip">Skip</string>
-    <string name="trigger_boredom">Boredom</string>
-    <string name="trigger_stress">Stress</string>
-    <string name="trigger_loneliness">Loneliness</string>
-    <string name="trigger_habit">Habit</string>
-    <string name="trigger_late_night">Late Night</string>
-    <string name="trigger_other">Other</string>
+    <!-- 2-hour lock -->
+    <string name="lock_shield">🛡️</string>
     <string name="lock_protection_active">Protection Active</string>
-    <string name="lock_remaining">Remaining: %1$s</string>
-    <string name="progress_title">Progress</string>
-    <string name="progress_avoided">Adult searches avoided</string>
-    <string name="progress_pauses">Awareness pauses completed</string>
-    <string name="progress_protection">Current protection</string>
-    <string name="progress_protection_locked">Locked</string>
-    <string name="progress_protection_open">Open</string>
-    <string name="progress_trigger">Most common trigger (past 7 days)</string>
-    <string name="progress_trigger_none">—</string>
+    <string name="lock_detected">Porn search detected.</string>
+    <string name="lock_hint">Use this time to step away from the urge.</string>
 </resources>

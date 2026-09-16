@@ -1,80 +1,64 @@
 # riy
 
-Minimal Android app (Kotlin) with a production-grade **GitHub auto-update** feature.
+Minimal Android app (Kotlin) — a **porn blocker** with an automatic
+**2-hour device lock**. Nothing else.
 
-## How the update flow works
+## What it does
 
-```text
-git tag v1.0.1 && git push origin v1.0.1
-        ↓
-GitHub Actions: unit tests → release APK (version derived from the tag)
-        ↓
-GitHub Release published with riy-v1.0.1.apk attached
-        ↓
-User opens the installed app
-        ↓
-One lightweight GET to api.github.com/repos/vishal507c-spec/riy/releases/latest
-        ↓
-latestVersionCode > installedVersionCode ?
-        ↓ yes
-"New Update Available" dialog → [Update Now] [Later]
-        ↓
-App-controlled HTTPS download of the private APK (real progress)
-        ↓
-APK verified (package name + no downgrade) → system installer
-        ↓
-Android verifies the signature at install time
-```
+1. **Blocks porn system-wide.** A DNS-filtering VPN service answers lookups for
+   adult domains with `0.0.0.0` before any connection is made. It works for
+   HTTPS too (the domain never resolves, so no TLS connection can start), and
+   enforces Google/Bing/DuckDuckGo/Yandex SafeSearch + YouTube Restricted Mode
+   at DNS level.
+2. **Locks the device for exactly 2 hours** when an adult-content request is
+   detected. The lock is a wall-clock deadline persisted on the device, so it
+   survives app restarts, force-stops and reboots. Only the deadline clears it.
 
-## Versioning
+## How each core piece works
 
-- `versionName` = git tag without the `v` prefix (e.g. `v1.0.10` → `1.0.10`).
-- `versionCode` = `major * 1_000_000 + minor * 1_000 + patch` (e.g. `1.0.10` → `1_001_010`).
-  Comparison is numeric, so `1.0.10 > 1.0.9` with no string-comparison bugs.
-  Invalid tags **fail the build** instead of silently mis-versioning.
-- Skipping releases is fine: the app always jumps straight to the latest stable release.
+| Component | Purpose |
+|---|---|
+| `blocker/BlockerVpnService.kt` | The filtering VPN: parses DNS on the tun, blocks adult queries, records detections |
+| `blocker/Blocklist.kt` | Adult-domain matching (blocklist + zero-false-positive heuristics) |
+| `blocker/SafeSearch.kt` | DNS-pins search engines to their safe frontends (server-side filtering) |
+| `blocker/DnsProtocol.kt`, `IpPacket.kt` | DNS / IP-UDP parse & reply building |
+| `blocker/BootReceiver.kt` | Restores protection after a reboot |
+| `lock/LockEngine.kt` | The 2-hour lock: deadline math, dedup, expiry — pure JVM |
+| `lock/LockStore.kt` | Persists the lock deadline (SharedPreferences) |
+| `lock/LockViewModel.kt` | Live countdown for the UI |
+| `ui/ProtectionScreen.kt` | The one screen: status + Enable Protection |
+| `ui/LockScreen.kt` | Non-dismissible lock screen with countdown |
+| `MainActivity.kt` | Entry point + protection self-heal |
 
-## Publishing an update
+## The detection point (honest note about Android limits)
 
-1. Commit your change and push to `main`.
-2. Tag and push:
-   ```bash
-   git tag v1.0.1
-   git push origin v1.0.1
-   ```
-3. GitHub Actions builds, tests, and publishes the Release with the APK.
-4. Users get the dialog the next time they open the app (checks are throttled
-   to at most once per hour per device).
+A keyword typed in the user's **own browser** (Chrome, etc.) travels inside
+encrypted HTTPS. No non-MITM Android app can read it — riy does **not** pretend
+to. What riy *can* reliably see, because it runs the filtering VPN, is the
+**DNS lookup that must happen before any porn site is reached**. That lookup is
+matched against the adult blocklist; the match simultaneously blocks the
+connection (for HTTP **and** HTTPS) and arms the 2-hour lock. This is the only
+technically valid control point available to a normal SDK-constrained app.
 
-## Optional: real release signing
+## Android limitations (no fake 100% claims)
 
-The workflow falls back to the debug signing key if secrets are absent, but a
-real distribution must always use the SAME key for every release (Android
-rejects updates signed with a different key). Configure these repository secrets:
-
-- `RELEASE_KEYSTORE_BASE64` — base64 of your `.jks` keystore (`base64 -w0 release.jks`)
-- `RELEASE_KEYSTORE_PASSWORD`
-- `RELEASE_KEY_ALIAS`
-- `RELEASE_KEY_PASSWORD`
+- A determined user can always revoke the VPN consent or uninstall the app —
+  Android gives no app an unkillable protection guarantee.
+- SafeSearch enforcement is DNS-based; it cannot control a browser using its
+  own encrypted DNS (e.g. Chrome with "secure DNS" pointed elsewhere), although
+  such lookups are routed into the filter where possible.
+- The lock screen cannot be dismissed, backed out of, or cleared by restarting
+  the app or rebooting the device. It is **an in-app lock**: while the lock is
+  live the blocking stays ON and riy shows the countdown. Android does not let
+  a normal SDK app forcibly lock *other* apps' windows (that needs Device Admin
+  / lock-task provisioning, which is a deliberately separate mechanism).
 
 ## Local development
 
 ```bash
-./gradlew :app:testDebugUnitTest   # unit tests (version comparison, release parsing)
+./gradlew :app:testDebugUnitTest           # JVM unit tests
+./gradlew :app:connectedDebugAndroidTest   # instrumented tests (needs a device/emulator)
 ./gradlew :app:assembleRelease "-PversionTag=v1.0.1"
 ```
 
-Requires JDK 17+ and an Android SDK (`ANDROID_HOME`). Open in Android Studio and run on a device/emulator.
-
-## Where the code lives
-
-| File | Purpose |
-|---|---|
-| `app/src/main/java/com/vishal/riy/update/VersionUtils.kt` | Numeric version parsing/comparison |
-| `app/src/main/java/com/vishal/riy/update/ReleaseInfo.kt` | GitHub release metadata parsing + URL allowlist |
-| `app/src/main/java/com/vishal/riy/update/UpdateChecker.kt` | Single lightweight HTTPS update check |
-| `app/src/main/java/com/vishal/riy/update/UpdatePreferences.kt` | 1-hour check throttle |
-| `app/src/main/java/com/vishal/riy/update/UpdateInstaller.kt` | app-controlled HTTPS download, APK verification, install intent |
-| `app/src/main/java/com/vishal/riy/update/UpdateDialogFragment.kt` | "New Update Available" dialog + progress |
-| `app/src/main/java/com/vishal/riy/MainActivity.kt` | Fires the async check on startup |
-| `.github/workflows/release.yml` | Tag-driven build/test/release pipeline |
+Requires JDK 17+ and an Android SDK (`ANDROID_HOME`).

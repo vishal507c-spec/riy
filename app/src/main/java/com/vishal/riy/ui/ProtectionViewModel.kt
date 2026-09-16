@@ -2,7 +2,6 @@ package com.vishal.riy.ui
 
 import android.app.Application
 import android.content.Context
-import android.net.VpnService
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vishal.riy.blocker.BlockerState
@@ -16,9 +15,9 @@ import kotlinx.coroutines.launch
 
 /**
  * Bridges the REAL protection state ([BlockerState], owned by
- * [BlockerVpnService]) to the Compose UI. The UI can only request
- * enable/disable — it can never fabricate a status, because the phase always
- * comes from the service.
+ * [BlockerVpnService]) to the Compose UI. The UI can only request enabling —
+ * it can never fabricate a status, because the phase always comes from the
+ * service.
  */
 class ProtectionViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -27,15 +26,9 @@ class ProtectionViewModel(application: Application) : AndroidViewModel(applicati
     private val _state = MutableStateFlow(BlockerState.current())
     val state: StateFlow<BlockerState.Snapshot> = _state.asStateFlow()
 
-    /** True when the user's persisted choice is ON (used for reboot-restore UX). */
-    val protectionWanted: Boolean get() = stateStore.isProtectionWanted()
-
-    /** True when the OS still needs the user to grant VPN consent. */
-    fun needsVpnPermission(): Boolean = VpnService.prepare(getApplication()) != null
-
     init {
-        // Lightweight poll (500 ms): keeps status, blocked counter and failure
-        // reasons live without any coupling between service and UI lifecycles.
+        // Lightweight poll (500 ms): keeps status and failure reasons live
+        // without any coupling between service and UI lifecycles.
         viewModelScope.launch {
             while (true) {
                 _state.value = BlockerState.current()
@@ -46,15 +39,10 @@ class ProtectionViewModel(application: Application) : AndroidViewModel(applicati
 
     /**
      * Requests protection start. Call ONLY after VPN consent is granted
-     * (see [needsVpnPermission] / the Activity result launcher in the UI).
+     * (see the Activity result launcher in the UI).
      */
     fun enableProtection(context: Context) {
         stateStore.setProtectionWanted(true)
         BlockerVpnService.start(context)
-    }
-
-    /** Stops protection and records the OFF choice (survives reboot). */
-    fun disableProtection(context: Context) {
-        BlockerVpnService.stop(context)
     }
 }

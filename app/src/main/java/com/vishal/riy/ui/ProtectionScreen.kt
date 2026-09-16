@@ -1,11 +1,7 @@
 package com.vishal.riy.ui
 
-import android.Manifest
 import android.app.Activity
-import android.content.Intent
 import android.net.VpnService
-import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -24,11 +20,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,26 +36,22 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vishal.riy.BuildConfig
 import com.vishal.riy.R
-import com.vishal.riy.awareness.AwarenessSnapshot
 import com.vishal.riy.blocker.BlockerState
 
 /**
- * Main screen: app name, real-time Protection ON/OFF status (driven by the
- * VPN service state, never faked), enable/disable/test actions and a small
- * settings/info section.
+ * The one and only screen of riy: app name, a heading, and the REAL protection
+ * status (driven by the VPN service state, never faked). The single action is
+ * enabling protection, which goes through the system VPN consent dialog.
  */
 @Composable
 fun ProtectionScreen(
-    onOpenProtectionTest: () -> Unit,
-    onOpenBrowser: () -> Unit,
-    awarenessSnapshot: AwarenessSnapshot? = null,
     modifier: Modifier = Modifier,
     viewModel: ProtectionViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    // VPN consent (system dialog) — on approval we actually start the service.
+    // VPN consent (system dialog) — on approval the service actually starts.
     val vpnConsentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -70,11 +59,6 @@ fun ProtectionScreen(
             viewModel.enableProtection(context)
         }
     }
-
-    // Notification permission (Android 13+); optional — service works either way.
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { }
 
     Column(
         modifier = modifier
@@ -84,80 +68,42 @@ fun ProtectionScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.app_shield),
+            style = typography.displayLarge,
+        )
         Text(
             text = stringResource(R.string.app_name),
             style = typography.headlineLarge,
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = stringResource(R.string.app_tagline),
-            style = typography.bodyMedium,
-            color = colorScheme.onSurfaceVariant,
+            text = stringResource(R.string.lock_protection_active),
+            style = typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
         )
 
         Spacer(Modifier.height(8.dp))
         ProtectionStatusCard(state.phase, state.failureReason)
 
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.blocked_counter_label, state.blockedCount),
-            style = typography.bodyMedium,
-            color = colorScheme.onSurfaceVariant,
-        )
-
-        // Minimal awareness/progress metrics (no streaks, no shaming).
-        awarenessSnapshot?.let { snapshot ->
-            AwarenessProgressSection(snapshot)
-        }
-
-        Spacer(Modifier.height(4.dp))
-
-        Button(
-            onClick = onOpenBrowser,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.action_open_browser))
-        }
-
+        Spacer(Modifier.height(8.dp))
         Button(
             onClick = {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
                 val consentIntent = VpnService.prepare(context)
                 if (consentIntent != null) {
-                    // System VPN consent dialog; service starts on approval.
                     vpnConsentLauncher.launch(consentIntent)
                 } else {
                     viewModel.enableProtection(context)
                 }
             },
+            enabled = state.phase != BlockerState.Phase.CONNECTING,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.action_enable_protection))
         }
 
-        OutlinedButton(
-            onClick = { viewModel.disableProtection(context) },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.action_disable_protection))
-        }
-
-        OutlinedButton(
-            onClick = onOpenProtectionTest,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.action_test_protection))
-        }
-
         Spacer(Modifier.height(8.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(4.dp))
-
-        SettingsSection()
-
         Text(
             text = stringResource(R.string.app_version_label, BuildConfig.VERSION_NAME),
             style = typography.bodySmall,
@@ -181,8 +127,8 @@ private fun ProtectionStatusCard(phase: BlockerState.Phase, failureReason: Strin
         )
         BlockerState.Phase.FAILED -> StatusStyle(
             stringResource(R.string.status_protection_failed),
-            MaterialTheme.colorScheme.errorContainer,
-            MaterialTheme.colorScheme.onErrorContainer,
+            colorScheme.errorContainer,
+            colorScheme.onErrorContainer,
         )
         else -> StatusStyle(
             stringResource(R.string.status_protection_off),
@@ -226,7 +172,7 @@ private fun StatusDot(phase: BlockerState.Phase) {
     val dotColor = when (phase) {
         BlockerState.Phase.CONNECTED -> Color(0xFF2E7D32)
         BlockerState.Phase.CONNECTING -> Color(0xFFF9A825)
-        BlockerState.Phase.FAILED -> MaterialTheme.colorScheme.error
+        BlockerState.Phase.FAILED -> colorScheme.error
         else -> Color(0xFF9E9E9E)
     }
     Box(
@@ -234,33 +180,4 @@ private fun StatusDot(phase: BlockerState.Phase) {
             .size(18.dp)
             .background(dotColor, CircleShape),
     )
-}
-
-@Composable
-private fun SettingsSection() {
-    val context = LocalContext.current
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.settings_title),
-            style = typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.settings_info_lines),
-            style = typography.bodySmall,
-            color = colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = {
-            runCatching {
-                context.startActivity(
-                    Intent(Settings.ACTION_VPN_SETTINGS)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
-            }
-        }) {
-            Text(stringResource(R.string.settings_open_vpn))
-        }
-    }
 }
