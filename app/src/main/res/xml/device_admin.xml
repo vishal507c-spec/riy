@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Minimum policy set required for Device Owner provisioning. RIY is
+         provisioned as Device Owner solely so it can later protect itself
+         (e.g. block its own uninstallation); no dangerous policies such as
+         wipe-data / reset-password / disable-camera are requested. The
+         specific policies needed by later phases will be declared here when
+         they are implemented. -->
+    <uses-policies>
+    </uses-policies>
+
+</device-admin>

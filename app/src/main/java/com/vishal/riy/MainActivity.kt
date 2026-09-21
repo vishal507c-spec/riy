@@ -19,11 +19,26 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContent { RiyApp() }
         restoreProtectionIfInterrupted()
+        protectUninstallIfOwner()
     }
 
     override fun onStart() {
         super.onStart()
         restoreProtectionIfInterrupted()
+    }
+
+    /**
+     * Self-heal: re-applies Device Owner uninstall protection at launch. This
+     * covers the case where the admin receiver was enabled before the owner
+     * state was committed during provisioning (a timing race), in which case
+     * the receiver's own call was a safe no-op.
+     */
+    private fun protectUninstallIfOwner() {
+        try {
+            com.vishal.riy.admin.UninstallProtection.apply(this)
+        } catch (e: Exception) {
+            Log.e("BlockerApp", "failed to apply uninstall protection", e)
+        }
     }
 
     /**

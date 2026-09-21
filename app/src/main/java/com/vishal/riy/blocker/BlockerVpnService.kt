@@ -10,9 +10,8 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.vishal.riy.R
-import com.vishal.riy.lock.LockEngine
-import com.vishal.riy.lock.LockState
-import com.vishal.riy.lock.PrefsLockStore
+import com.vishal.riy.protection.ProtectionEventProcessor
+import com.vishal.riy.protection.adultDomainLookupEvent
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,20 +69,19 @@ class BlockerVpnService : VpnService() {
      * request is actually observable on Android without decrypting TLS:
      * before any browser can connect to a porn site it must resolve the host,
      * and that DNS query passes through this filter. A query matching the
-     * adult [Blocklist] is (a) answered locally with 0.0.0.0 so the connection
-     * never happens, and (b) recorded here, arming the 2-hour lock.
+     * adult [Blocklist] is answered locally with 0.0.0.0 so the connection
+     * never happens, and is reported to the protection pipeline here.
      *
      * Note on search queries: a keyword typed in the user's OWN browser (e.g.
      * Chrome) travels inside encrypted HTTPS and is NOT visible to any
      * non-MITM Android app, so no fake keyword detection is attempted. What
      * IS reliably visible is the adult-domain lookup itself — the step that
      * necessarily precedes every porn-site visit — and that is what arms the
-     * lock.
+     * protection session.
      */
-    private val lockStore: PrefsLockStore by lazy { PrefsLockStore(this) }
-
-    @Volatile
-    private var lockState: LockState = LockState.EMPTY
+    private val protection: ProtectionEventProcessor by lazy {
+        ProtectionEventProcessor.forContext(this)
+    }
 
     /**
      * Network-level SafeSearch enforcement: search engines are DNS-pinned to
@@ -146,6 +144,18 @@ class BlockerVpnService : VpnService() {
                 // restart only when the user's persisted choice was ON.
                 if (BlockerStateStore(this).isProtectionWanted()) {
                     Log.i(TAG, "sticky restart; restoring protection")
+                    // PHASE 6 — the process died and was respawned, so the
+                    // in-memory expectation of a restriction is gone while the
+                    // persisted session and the LockEngine deadline survive.
+                    // Reconcile both directions BEFORE filtering resumes: a
+                    // live restriction is re-applied, an expired one cleared.
+                    // This is the existing recovery orchestrator, not a new
+                    // one, and it touches no deadline.
+                    runCatching {
+                        ProtectionEventProcessor.recoveryForContext(this).recover()
+                    }.onFailure { e ->
+                        Log.w(TAG, "recovery on sticky restart failed: ${e.message}")
+                    }
                     startFiltering(allowRetry = true)
                     android.app.Service.START_STICKY
                 } else {
@@ -191,9 +201,6 @@ class BlockerVpnService : VpnService() {
             fail("internal error: blocklist")
             return
         }
-
-        // Pick up any lock deadline persisted before this process started.
-        runCatching { lockState = LockEngine.clearIfExpired(lockStore.loadState(), System.currentTimeMillis()) }
 
         val fd = try {
             establishVpn()
@@ -350,21 +357,28 @@ class BlockerVpnService : VpnService() {
     // ------------------------------------------------------------- detection
 
     /**
-     * Turns a blocked adult-domain lookup into a 2-hour lock. Dedup of A/AAAA
-     * + retries for the same domain is handled by [LockEngine]; the deadline
-     * is persisted immediately so it survives even if the process is killed
-     * right after this call. Failures here never break the block itself — the
-     * 0.0.0.0 answer has already been written by the caller.
+     * THE DETECTION POINT submits one normalised protection event and nothing
+     * more. The blocking answer itself (0.0.0.0) has already been written by
+     * [processPacket]; every consequence of this observation — the risk grade,
+     * the policy decision, the session, the 2-hour deadline and the platform
+     * restriction — is owned further down the existing chain and is reached
+     * through [ProtectionEventProcessor].
+     *
+     * This method therefore owns DETECTION ONLY: it computes no deadline, holds
+     * no state machine and never touches DevicePolicyManager. A failure inside
+     * the pipeline never weakens the DNS block that already happened.
      */
     private fun recordPornDetection(domain: String) {
-        val now = System.currentTimeMillis()
-        val current = lockState
-        val next = LockEngine.onPornDetected(current, now, domain)
-        if (next === current) return
-        lockState = next
-        runCatching { lockStore.saveState(next) }
-            .onFailure { Log.w(TAG, "lock state could not be persisted: ${it.message}") }
-        Log.i(TAG, "adult-content detection: '$domain' -> 2-hour lock until ${next.lockEndEpochMillis}")
+        runCatching {
+            val result = protection.submit(adultDomainLookupEvent(domain, System.currentTimeMillis()))
+            Log.i(
+                TAG,
+                "adult-content detection: '$domain' -> ${result.decision.nextState} " +
+                    "(enforcement=${result.enforcementResult})",
+            )
+        }.onFailure { e ->
+            Log.w(TAG, "protection pipeline failed: ${e.javaClass.simpleName}: ${e.message}")
+        }
     }
 
     private fun writeReply(output: FileOutputStream, packet: ByteArray) {

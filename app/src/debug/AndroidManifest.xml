@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+
+    DEBUG-BUILD-ONLY manifest fragment.
+
+    The EnforcementTestActivity below is Phase 4's internal manual-test entry
+    point. It is declared ONLY in the debug source set, so it is merged into
+    the debug manifest and compiled out of every release build: a production
+    APK cannot contain it.
+
+    It is exported SOLELY so an adb shell (`am start`) can launch it for the
+    manual Phase 4 device test; it has no launcher category and no user-facing
+    entry point, so it never becomes a bypass or disable button in the UI.
+    Because this whole file exists only in the debug source set, the exported
+    flag can never reach a production build.
+
+    Remove this file and EnforcementTestActivity.kt before a production release.
+
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <activity
+            android:name=".debug.EnforcementTestActivity"
+            android:exported="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+
+    </application>
+
+</manifest>

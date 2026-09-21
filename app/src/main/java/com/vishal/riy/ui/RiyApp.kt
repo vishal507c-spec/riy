@@ -5,28 +5,37 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.vishal.riy.lock.LockViewModel
 
 /**
- * Root composable. There is exactly ONE screen:
- *  - while a lock is live -> [LockScreen] (full-screen, non-dismissible countdown)
- *  - otherwise            -> [ProtectionScreen] (status + enable)
+ * Root composable. Exactly ONE screen, chosen solely by the authoritative
+ * [com.vishal.riy.protection.ui.ProtectionUiState] the backend publishes:
  *
- * While locked the system Back gesture/key is consumed and cannot dismiss or
- * bypass the lock. There is no browser, no search UI and no navigation — the
- * lock can only be cleared by the deadline itself.
+ *  - a live restriction (RESTRICTED / HARDENED), or a recovery that must not be
+ *    dismissed → [LockScreen] (full-screen, non-dismissible countdown);
+ *  - otherwise → [ProtectionScreen] (status + enable).
+ *
+ * While restricted the system Back gesture/key is consumed and cannot dismiss or
+ * bypass the lock. There is no browser, no search UI and no navigation — a
+ * restriction can only be cleared by the backend's own deadline.
+ *
+ * This composable holds no security logic: it cannot decide a state, compute a
+ * deadline, or reach any enforcement object. It only routes what the bridge
+ * already decided.
  */
 @Composable
 fun RiyApp() {
     RiyTheme {
-        val lockViewModel: LockViewModel = viewModel()
-        val lockState by lockViewModel.state.collectAsStateWithLifecycle()
+        val viewModel: ProtectionViewModel = viewModel()
+        val state by viewModel.state.collectAsStateWithLifecycle()
 
-        // A locked user cannot back out of the lock screen.
-        BackHandler(enabled = lockState.locked) { /* intentionally consumed */ }
+        // A locked user cannot back out of the lock screen. Recovery is equally
+        // non-dismissible: the backend is mid-restore and must not be bypassed.
+        val lockActive = state.isRestricted || state.isRecovering
 
-        if (lockState.locked) {
-            LockScreen(remainingMillis = lockState.remainingMillis)
+        BackHandler(enabled = lockActive) { /* intentionally consumed */ }
+
+        if (lockActive) {
+            LockScreen(state = state)
         } else {
             ProtectionScreen()
         }

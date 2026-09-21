@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.1.0 - 2026-09-21
+- Phase 7 — Protection UI integration. The Compose UI now observes the REAL backend protection state through a one-way data flow: `authoritative backend → ProtectionStateBridge → ProtectionUiState → Compose UI`. The UI is rendering-only; it can never become a security authority
+- New `DefaultProtectionStateBridge`: the single read-only translator combining the protection state store, the LockEngine/LockStore deadline (sole authority), the live enforcement read-back, the integrity engine, the app-policy resolver and the event store. It writes nothing, computes no deadline and exposes no disable/pause/bypass
+- `ProtectionUiState` minimally extended with `enforcementStatus` plus derived `isRecovering` / `enforcementVerified` / `enforcementMismatch`. The existing `ProtectionState` enum is reused — no second state machine
+- The lock screen now distinguishes Restricted Mode vs Hardened Mode, shows the escalation message and the honest enforcement status. HARDENED reuses the SAME deadline as RESTRICTED — there is deliberately no second timer
+- A recovery/reconciling backend shows a non-bypassable "Restoring Protection…" screen; an enforcement mismatch shows "Protection Warning" and is never labelled as protected
+- The countdown is derived from the authoritative LockEngine deadline (`LockEngine.remainingMillis`), never recomputed; the display ticker only re-reads it
+- Process death / reboot: the UI reconstructs itself from the persisted backend state — a fresh bridge reading the same stores reproduces the screen
+- Removed the superseded `LockViewModel` so there is exactly one countdown owner
+- 262 unit tests + 3 instrumented tests passing; debug and release builds verified; release APK confirmed to contain no debug test seam
+
 ## v2.0.0 - 2026-09-16
 - Riy is now exactly one thing: a **porn blocker + automatic 2-hour device lock**. Every unrelated feature is gone — no in-app browser, no address bar/search UI, no image-search tier, no on-device NSFW classifier (model + TFLite dependency removed), no GitHub auto-update, no awareness pause/trigger/metrics flow, no maintenance window, no extra dashboards or settings
 - Blocking is unchanged and proven: DNS-filtering VPN answers adult-domain lookups with 0.0.0.0 before any connection (works for HTTPS too, no TLS interception), plus enforced Google/Bing/DuckDuckGo/Yandex SafeSearch and YouTube Restricted Mode at DNS level

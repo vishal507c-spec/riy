@@ -10,6 +10,44 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!--
+        PACKAGE VISIBILITY (Android 11+ / targetSdk 30+).
+
+        RIY targets the newest SDK, so the platform hides other apps' packages
+        from it by default. The app policy resolver discovers the device's REAL
+        dialer, emergency dialer and wallet apps by querying the intent actions
+        below; without these declarations every such query returns empty and the
+        resolver legitimately reports the packages as UNRESOLVED.
+
+        This block declares VISIBILITY ONLY — it lets PackageManager see which
+        apps declare these filters. It grants no permission, adds no package
+        name, and decides nothing about what is allowed; the resolver still
+        performs discovery and the enforcement engine's safety gate still
+        decides what is safe to apply.
+    -->
+    <queries>
+
+        <!-- The device's dialer / phone app (ACTION_DIAL, ACTION_CALL). -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.CALL" />
+        </intent>
+
+        <!-- The emergency dialer. -->
+        <intent>
+            <action android:name="android.intent.action.DIAL_EMERGENCY" />
+        </intent>
+
+        <!-- Wallet / UPI payment apps (declared via the upi URI scheme). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" />
+        </intent>
+
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
@@ -44,6 +82,47 @@
         <!-- Restores protection automatically after a device reboot. -->
         <receiver
             android:name=".blocker.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Device Admin component. This is the anchor the system uses to
+             identify RIY when it is provisioned as the Device Owner. Only the
+             system (holder of BIND_DEVICE_ADMIN) may bind it. -->
+        <receiver
+            android:name=".admin.RiyDeviceAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+        </receiver>
+
+        <!-- Package-state watchdog: wakes only on real Android package
+             broadcasts aimed at RIY (no polling). Used to detect OEM
+             freezer/power-manager actuation and record it as an integrity
+             result. -->
+        <receiver
+            android:name=".protection.integrity.PackageStateWatcher"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_CHANGED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Verifies package protection after a reboot and re-applies the one
+             idempotent Device Owner protection (uninstall blocking). Never
+             reinstalls or downloads anything. -->
+        <receiver
+            android:name=".protection.recovery.PackageBootRecovery"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
