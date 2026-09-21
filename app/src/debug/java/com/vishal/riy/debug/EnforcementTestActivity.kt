@@ -15,6 +15,7 @@ import com.vishal.riy.protection.enforcement.platform.AndroidPackageDiscoveryBou
 import com.vishal.riy.protection.enforcement.PackageManagerAppPolicyResolver
 import com.vishal.riy.protection.policy.ProtectionState
 import com.vishal.riy.protection.state.ProtectionSession
+import com.vishal.riy.lock.LockEngine
 
 /**
  * INTERNAL TEST HOOK — Phase 4 only.
@@ -259,11 +260,19 @@ class EnforcementTestActivity : Activity() {
         log(if (ok) "=== Phase 5 pipeline test: PASS ===" else "=== Phase 5 pipeline test: FAIL ===")
     }
 
+    /**
+     * The session this hook tests with. Its expiry MIRRORS the duration the one
+     * deadline owner defines — [LockEngine.LOCK_DURATION_MS] — rather than
+     * restating the number, so a test can never drift from the production
+     * contract. The authoritative deadline itself is still armed by LockEngine
+     * through the real pipeline (see [runPipelineTest]); this object is only
+     * used by the Phase 4 manual [STEP_ENTER]/[STEP_FULLTEST] steps.
+     */
     private fun testSession(): ProtectionSession = ProtectionSession(
         sessionId = "phase4-manual-test",
         state = ProtectionState.RESTRICTED,
         startTime = System.currentTimeMillis(),
-        expiryTime = System.currentTimeMillis() + 7_200_000L,
+        expiryTime = System.currentTimeMillis() + LockEngine.LOCK_DURATION_MS,
         reason = "phase4_manual_test",
         policyVersion = 1,
     )

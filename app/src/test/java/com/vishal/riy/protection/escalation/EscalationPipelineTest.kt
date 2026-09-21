@@ -2,6 +2,7 @@ package com.vishal.riy.protection.escalation
 
 import com.vishal.riy.lock.InMemoryLockStore
 import com.vishal.riy.lock.LockEngine
+import com.vishal.riy.lock.LockState
 import com.vishal.riy.protection.ProtectionEventProcessor
 import com.vishal.riy.protection.adultDomainLookupEvent
 import com.vishal.riy.protection.enforcement.AndroidEnforcementEngine
@@ -17,6 +18,7 @@ import com.vishal.riy.protection.policy.ProtectionState
 import com.vishal.riy.protection.restricted.DefaultRestrictedModeController
 import com.vishal.riy.protection.risk.DefaultRiskEngine
 import com.vishal.riy.protection.state.InMemoryProtectionStateStore
+import com.vishal.riy.protection.state.ProtectionSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -313,6 +315,46 @@ class EscalationPipelineTest {
 
         assertEquals(ProtectionState.HARDENED, escalated.decision.nextState)
         assertEquals(ProtectionDecision.REASON_ESCALATED, escalated.decision.reason)
+    }
+
+    // --------------------------- §16 deadline ownership, divergent mirror
+
+    @Test
+    fun `a divergent session mirror never overwrites the LockEngine deadline`() {
+        // Two qualifying events are already counted, so the next one escalates.
+        escalationStore.save(EscalationState(listOf(now - 2 * MINUTE, now - MINUTE)))
+
+        // DIVERGENCE: the persisted session MIRRORS a much later expiry than the
+        // authoritative LockEngine deadline. Only LockEngine may say when the
+        // restriction ends, so this corrupted/widened mirror must NOT be able to
+        // push the real deadline out.
+        val authoritativeDeadline = now + 30 * MINUTE
+        lockStore.saveState(LockState(lockEndEpochMillis = authoritativeDeadline))
+        stateStore.save(
+            ProtectionSession(
+                sessionId = "divergent",
+                state = ProtectionState.RESTRICTED,
+                startTime = now - 2 * MINUTE,
+                expiryTime = now + 6 * 60 * MINUTE, // a mirror that disagrees
+                reason = ProtectionDecision.REASON_CONTENT_DETECTED,
+                policyVersion = 1,
+            ),
+        )
+
+        val escalated = submit()
+
+        assertEquals(ProtectionState.HARDENED, escalated.decision.nextState)
+
+        assertEquals(
+            "LockEngine's deadline is untouched — the mirror could not move it",
+            authoritativeDeadline,
+            lockStore.loadState().lockEndEpochMillis,
+        )
+        assertEquals(
+            "and the re-recorded session is repaired to mirror the deadline",
+            authoritativeDeadline,
+            stateStore.current()!!.expiryTime,
+        )
     }
 
     // ------------------------------------------------------------- helper

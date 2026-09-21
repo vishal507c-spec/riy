@@ -170,7 +170,13 @@ class ProtectionEventProcessor(
 
         // ---- THE DEADLINE -------------------------------------------------
         // LockEngine computes it, LockStore persists it. The session below only
-        // mirrors the value it produces here; it never becomes a second one.
+        // mirrors the value produced here; it never becomes a second one.
+        //
+        // READ DIRECTION: the deadline is read from LockStore only. This class
+        // never writes a value it took from the session store back into
+        // LockStore, because that would make the mirror an authority over the
+        // thing it mirrors. Should the two ever disagree, LockEngine's
+        // persisted deadline wins — which is what its documented contract says.
         //
         // REPEATED-EVENT / ESCALATION RULE: when a session is ALREADY live, the
         // existing deadline is preserved as-is. This covers both a repeated
@@ -181,12 +187,15 @@ class ProtectionEventProcessor(
         // window. LockEngine stays the sole deadline authority.
         val domain = event.metadata[ProtectionEvent.META_DOMAIN].orEmpty()
         val previous = LockEngine.clearIfExpired(lockStore.loadState(), now)
-        val liveDeadline = stateStore.current()
-            ?.takeIf { it.state.isRestrictedSession() && !it.isExpired(now) }
-            ?.expiryTime
-            ?.takeIf { LockEngine.isLocked(previous, now) }
-        val armed = if (liveDeadline != null) {
-            previous.copy(lockEndEpochMillis = liveDeadline)
+        val sessionAlreadyLive = stateStore.current()
+            ?.let { it.state.isRestrictedSession() && !it.isExpired(now) }
+            ?: false
+        val armed = if (sessionAlreadyLive && LockEngine.isLocked(previous, now)) {
+            // A restriction is already in force: keep LockEngine's own
+            // persisted deadline untouched. Re-arming here would reset the
+            // 2-hour window; the session recorded below mirrors this same
+            // value, so RESTRICTED and HARDENED can never mean two timers.
+            previous
         } else {
             LockEngine.onPornDetected(previous, now, domain)
         }

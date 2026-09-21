@@ -6,6 +6,7 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+.kotlin/
 *.keystore
 !debug.keystore
 *.jks
