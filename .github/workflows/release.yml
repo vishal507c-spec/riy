@@ -73,6 +73,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.ANDROID_PRIVATE_PAT }}
         run: |
           echo "::add-mask::${{ secrets.ANDROID_PRIVATE_PAT }}"
+          # Commits made from Windows strip the Unix executable bit; without
+          # this the checkout fails with "./gradlew: Permission denied".
+          chmod +x gradlew
           ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleRelease "-PversionTag=${{ github.ref_name }}"
 
       - name: Rename APK with version
