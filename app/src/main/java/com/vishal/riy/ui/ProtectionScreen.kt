@@ -1,4 +1,4 @@
-package com.vishal.riy.ui
+﻿package com.vishal.riy.ui
 
 import android.app.Activity
 import android.content.Context
@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.Text
@@ -34,26 +35,30 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vishal.riy.BuildConfig
 import com.vishal.riy.R
 import com.vishal.riy.blocker.BlockerState
-import com.vishal.riy.lock.LockEngine
-import com.vishal.riy.protection.enforcement.EnforcementStatus
-import com.vishal.riy.protection.policy.ProtectionState
 import com.vishal.riy.protection.ui.ProtectionUiState
 
 /**
- * The one and only screen of riy. It renders the AUTHORITATIVE
- * [ProtectionUiState] published by the protection backend — it never decides a
+ * The one and only screen of RIY when no restriction is live. It renders the
+ * AUTHORITATIVE [ProtectionUiState] the backend publishes â€” it never decides a
  * state, never computes a deadline, and offers exactly one action: enabling the
  * filtering VPN after the system consent dialog.
  *
- * The screen is deliberately stateless with respect to security: every label,
- * colour and countdown is a pure function of [state]. There is deliberately no
- * Disable, Pause, Bypass, "Continue Anyway" or Close control anywhere.
+ * ZERO CONFUSION. The screen is deliberately minimal: one large status icon, one
+ * large title, one short explanation, one primary status card, and an optional
+ * details section. No risk score, no technical state, no event counts, no
+ * package names, no logs and no engine names are ever shown. The internal state
+ * vocabulary of the protection backend appears nowhere in the UI.
+ *
+ * The screen is stateless with respect to security: every label, colour and
+ * countdown is a pure function of [state]. There is deliberately no Disable,
+ * Pause, Bypass, "Continue Anyway" or Close control anywhere.
  */
 @Composable
 fun ProtectionScreen(
@@ -64,7 +69,7 @@ fun ProtectionScreen(
     val context = LocalContext.current
     val blockerSnapshot = BlockerState.current()
 
-    // VPN consent (system dialog) — on approval the service actually starts.
+    // VPN consent (system dialog) â€” on approval the service actually starts.
     val vpnConsentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -78,7 +83,6 @@ fun ProtectionScreen(
     ProtectionScreen(
         state = state,
         blockerPhase = blockerSnapshot.phase,
-        blockerFailureReason = blockerSnapshot.failureReason,
         // The single UI action. It goes through the system VPN consent dialog
         // first; consent is never assumed and never implied.
         onEnableProtection = {
@@ -94,18 +98,18 @@ fun ProtectionScreen(
 }
 
 /**
- * Stateless rendering of one [ProtectionUiState]. Kept free of any ViewModel or
- * Android framework write so the mapping "state → screen" can be reasoned about
- * (and asserted) on its own.
+ * Stateless rendering of one [ProtectionUiState], kept free of any ViewModel so
+ * the mapping "state â†’ screen" can be reasoned about and asserted on its own.
  */
 @Composable
 internal fun ProtectionScreen(
     state: ProtectionUiState,
     blockerPhase: BlockerState.Phase,
-    blockerFailureReason: String?,
     onEnableProtection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val presentation = state.userFacing()
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -114,38 +118,52 @@ internal fun ProtectionScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
+
+        // 1. One large status icon.
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .background(colorScheme.primaryContainer, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = presentation.icon,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = colorScheme.onPrimaryContainer,
+            )
+        }
+
+        // 2. One large title.
         Text(
-            text = stringResource(R.string.app_shield),
-            style = typography.displayLarge,
-        )
-        Text(
-            text = stringResource(R.string.app_name),
-            style = typography.headlineLarge,
+            text = stringResource(presentation.titleRes),
+            style = typography.headlineMedium,
             fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+
+        // 3. One short explanation.
+        Text(
+            text = stringResource(presentation.detailRes),
+            style = typography.bodyLarge,
+            color = colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
 
         Spacer(Modifier.height(8.dp))
-        ModeHeader(state)
-        ProtectionStatusCard(state, blockerPhase, blockerFailureReason)
 
-        if (state.isRestricted) {
-            Spacer(Modifier.height(8.dp))
-            RestrictionDetails(state)
-        }
+        // 4. One primary status card.
+        PrimaryStatusCard(state, blockerPhase)
 
-        if (state.isRecovering || state.enforcementMismatch) {
-            Spacer(Modifier.height(8.dp))
-            RecoveryOrMismatchCard(state)
-        }
-
-        Spacer(Modifier.height(8.dp))
-        IntegrityLine(state)
+        // 5. Optional Protection Details, in normal language.
+        ProtectionDetailsCard(state)
 
         // The single action the UI may offer, and only when nothing is
-        // restricting the device. While RESTRICTED/HARDENED/RECOVERY is live
-        // there is no affordance at all — protection cannot be turned off here.
+        // restricting the device. While a restriction or a restoration is live
+        // there is no affordance at all â€” protection cannot be turned off here.
         if (!state.isRestricted && !state.isRecovering) {
+            Spacer(Modifier.height(8.dp))
             Button(
                 onClick = onEnableProtection,
                 enabled = blockerPhase != BlockerState.Phase.CONNECTING,
@@ -165,276 +183,78 @@ internal fun ProtectionScreen(
 }
 
 /**
- * The mode title, taken straight from the authoritative state. RESTRICTED and
- * HARDENED are never labelled as each other, and NORMAL is never labelled
- * "restricted".
+ * The one primary status card. While nothing is restricted it states plainly
+ * whether the filter is running; the text always comes from the REAL service
+ * state, so the card can never claim protection that is not there.
  */
 @Composable
-private fun ModeHeader(state: ProtectionUiState) {
-    val title = when {
-        state.protectionState == ProtectionState.HARDENED ->
-            stringResource(R.string.mode_hardened)
-        state.isRestricted -> stringResource(R.string.mode_restricted)
-        state.isRecovering -> stringResource(R.string.recovery_title)
-        else -> stringResource(R.string.mode_normal)
-    }
-    Text(
-        text = title,
-        style = typography.titleLarge,
-        fontWeight = FontWeight.SemiBold,
-        color = if (state.isRestricted || state.isRecovering) colorScheme.primary
-        else colorScheme.onBackground,
-    )
-}
-
-@Composable
-private fun ProtectionStatusCard(
+private fun PrimaryStatusCard(
     state: ProtectionUiState,
     phase: BlockerState.Phase,
-    failureReason: String?,
 ) {
-    val style = when {
-        state.enforcementMismatch -> StatusStyle(
-            stringResource(R.string.mismatch_title),
-            colorScheme.errorContainer,
-            colorScheme.onErrorContainer,
-        )
-        state.isRecovering -> StatusStyle(
-            stringResource(R.string.recovery_title),
-            colorScheme.tertiaryContainer,
-            colorScheme.onTertiaryContainer,
-        )
-        state.protectionState == ProtectionState.HARDENED -> StatusStyle(
-            stringResource(R.string.mode_hardened),
-            colorScheme.errorContainer,
-            colorScheme.onErrorContainer,
-        )
-        state.isRestricted -> StatusStyle(
-            stringResource(R.string.mode_restricted),
-            colorScheme.primaryContainer,
-            colorScheme.onPrimaryContainer,
-        )
-        phase == BlockerState.Phase.CONNECTED -> StatusStyle(
-            stringResource(R.string.status_protection_on),
-            colorScheme.primaryContainer,
-            colorScheme.onPrimaryContainer,
-        )
-        phase == BlockerState.Phase.CONNECTING -> StatusStyle(
-            stringResource(R.string.status_connecting),
-            colorScheme.tertiaryContainer,
-            colorScheme.onTertiaryContainer,
-        )
-        phase == BlockerState.Phase.FAILED -> StatusStyle(
-            stringResource(R.string.status_protection_failed),
-            colorScheme.errorContainer,
-            colorScheme.onErrorContainer,
-        )
-        else -> StatusStyle(
-            stringResource(R.string.status_protection_off),
-            colorScheme.surfaceVariant,
-            colorScheme.onSurfaceVariant,
-        )
+    val container = when {
+        phase == BlockerState.Phase.FAILED -> colorScheme.errorContainer
+        phase == BlockerState.Phase.CONNECTED -> colorScheme.primaryContainer
+        phase == BlockerState.Phase.CONNECTING -> colorScheme.tertiaryContainer
+        else -> colorScheme.surfaceVariant
     }
+    val content = when {
+        phase == BlockerState.Phase.FAILED -> colorScheme.onErrorContainer
+        phase == BlockerState.Phase.CONNECTED -> colorScheme.onPrimaryContainer
+        phase == BlockerState.Phase.CONNECTING -> colorScheme.onTertiaryContainer
+        else -> colorScheme.onSurfaceVariant
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = style.container),
+        colors = CardDefaults.cardColors(containerColor = container),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            StatusDot(state, phase)
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = style.label,
-                style = typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = style.content,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = statusDetail(state, phase, failureReason),
-                style = typography.bodySmall,
-                color = style.content,
-            )
-        }
-    }
-}
-
-@Composable
-private fun statusDetail(
-    state: ProtectionUiState,
-    phase: BlockerState.Phase,
-    failureReason: String?,
-): String = when {
-    state.enforcementMismatch -> stringResource(R.string.mismatch_detail)
-    state.isRecovering -> stringResource(R.string.recovery_detail)
-    state.protectionState == ProtectionState.HARDENED ->
-        stringResource(R.string.hardened_detail)
-    state.isRestricted -> stringResource(R.string.restricted_detail)
-    phase == BlockerState.Phase.CONNECTED -> stringResource(R.string.status_detail_active)
-    phase == BlockerState.Phase.CONNECTING -> stringResource(R.string.status_detail_connecting)
-    phase == BlockerState.Phase.FAILED ->
-        failureReason ?: stringResource(R.string.status_detail_failed)
-    else -> stringResource(R.string.status_detail_off)
-}
-
-/**
- * Restriction-specific facts: the countdown derived from the authoritative
- * deadline, and the allowed apps the resolver actually verified on this device.
- * No domain names or raw DNS history are shown.
- */
-@Composable
-private fun RestrictionDetails(state: ProtectionUiState) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceVariant),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = stringResource(R.string.time_remaining_label),
-                style = typography.labelMedium,
-                color = colorScheme.onSurfaceVariant,
-            )
-            // The deadline is LockEngine's. The UI only formats what it is given.
-            Text(
-                text = LockEngine.formatRemaining(state.remainingTime),
-                style = typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            if (state.allowedApps.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.allowed_apps_label),
-                    style = typography.labelMedium,
-                    color = colorScheme.onSurfaceVariant,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .background(dotColor(phase), CircleShape),
                 )
-                state.allowedApps.forEach { app ->
-                    Text(
-                        text = app.displayName,
-                        style = typography.bodyMedium,
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.protection_active_line),
+                    style = typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = content,
+                )
             }
-        }
-    }
-}
-
-/**
- * Recovery and enforcement-mismatch are shown through the SAME honest card so
- * neither can be mistaken for a successfully-applied restriction. There is no
- * button in it — only the backend resolves either condition.
- */
-@Composable
-private fun RecoveryOrMismatchCard(state: ProtectionUiState) {
-    val isMismatch = state.enforcementMismatch
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isMismatch) colorScheme.errorContainer
-            else colorScheme.tertiaryContainer,
-        ),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
             Text(
-                text = if (isMismatch) stringResource(R.string.mismatch_title)
-                else stringResource(R.string.recovery_title),
-                style = typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (isMismatch) colorScheme.onErrorContainer
-                else colorScheme.onTertiaryContainer,
-            )
-            Text(
-                text = if (isMismatch) stringResource(R.string.mismatch_detail)
-                else stringResource(R.string.recovery_detail),
-                style = typography.bodySmall,
-                color = if (isMismatch) colorScheme.onErrorContainer
-                else colorScheme.onTertiaryContainer,
-            )
-        }
-    }
-}
-
-/**
- * The integrity line reports the real Device Owner / uninstall-protection /
- * enforcement read-back — never a reassuring default. While unverified it says
- * so plainly instead of claiming protection is healthy.
- */
-@Composable
-private fun IntegrityLine(state: ProtectionUiState) {
-    val enforcementText = when {
-        state.enforcementMismatch -> stringResource(R.string.enforcement_mismatch)
-        state.enforcementVerified -> stringResource(R.string.enforcement_verified)
-        state.isRecovering -> stringResource(R.string.enforcement_pending)
-        else -> stringResource(R.string.enforcement_mismatch)
-    }
-    val dotColor = when {
-        state.enforcementMismatch -> colorScheme.error
-        state.enforcementVerified -> Color(0xFF2E7D32)
-        else -> Color(0xFFF9A825)
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(12.dp)
-                .background(dotColor, CircleShape),
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = enforcementText,
+                text = filterDetail(phase),
                 style = typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-            val integrityText = if (state.deviceOwnerActive && state.uninstallProtectionActive) {
-                stringResource(R.string.integrity_owner_active) + " · " +
-                    stringResource(R.string.integrity_uninstall_active)
-            } else {
-                stringResource(R.string.integrity_unavailable)
-            }
-            Text(
-                text = integrityText,
-                style = typography.bodySmall,
-                color = colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                color = content,
             )
         }
     }
 }
 
 @Composable
-private fun StatusDot(state: ProtectionUiState, phase: BlockerState.Phase) {
-    val dotColor = when {
-        state.enforcementMismatch -> colorScheme.error
-        state.isRecovering -> Color(0xFFF9A825)
-        state.protectionState == ProtectionState.HARDENED -> colorScheme.error
-        state.isRestricted -> Color(0xFF2E7D32)
-        phase == BlockerState.Phase.CONNECTED -> Color(0xFF2E7D32)
-        phase == BlockerState.Phase.CONNECTING -> Color(0xFFF9A825)
-        phase == BlockerState.Phase.FAILED -> colorScheme.error
-        else -> Color(0xFF9E9E9E)
-    }
-    Box(
-        modifier = Modifier
-            .size(18.dp)
-            .background(dotColor, CircleShape),
-    )
+private fun filterDetail(phase: BlockerState.Phase): String = when (phase) {
+    BlockerState.Phase.CONNECTED -> stringResource(R.string.filter_on)
+    BlockerState.Phase.CONNECTING -> stringResource(R.string.filter_connecting)
+    BlockerState.Phase.FAILED -> stringResource(R.string.filter_failed)
+    BlockerState.Phase.OFF -> stringResource(R.string.filter_off)
 }
 
-private data class StatusStyle(val label: String, val container: Color, val content: Color)
+@Composable
+private fun dotColor(phase: BlockerState.Phase): Color = when (phase) {
+    BlockerState.Phase.CONNECTED -> Color(0xFF2E7D32)
+    BlockerState.Phase.CONNECTING -> Color(0xFFF9A825)
+    BlockerState.Phase.FAILED -> colorScheme.error
+    BlockerState.Phase.OFF -> Color(0xFF9E9E9E)
+}
+

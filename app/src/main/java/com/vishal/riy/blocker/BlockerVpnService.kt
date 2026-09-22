@@ -10,8 +10,8 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.vishal.riy.R
-import com.vishal.riy.protection.ProtectionEventProcessor
-import com.vishal.riy.protection.adultDomainLookupEvent
+import com.vishal.riy.protection.intelligence.ProtectionIntelligence
+import com.vishal.riy.protection.recovery.DefaultRecoveryService
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,22 +65,14 @@ class BlockerVpnService : VpnService() {
     private var retryAttempt = 0
 
     /**
-     * THE DETECTION POINT. This service is the only place an adult-content
-     * request is actually observable on Android without decrypting TLS:
-     * before any browser can connect to a porn site it must resolve the host,
-     * and that DNS query passes through this filter. A query matching the
-     * adult [Blocklist] is answered locally with 0.0.0.0 so the connection
-     * never happens, and is reported to the protection pipeline here.
-     *
-     * Note on search queries: a keyword typed in the user's OWN browser (e.g.
-     * Chrome) travels inside encrypted HTTPS and is NOT visible to any
-     * non-MITM Android app, so no fake keyword detection is attempted. What
-     * IS reliably visible is the adult-domain lookup itself — the step that
-     * necessarily precedes every porn-site visit — and that is what arms the
-     * protection session.
+     * THE Phase 10 intelligence front-end. It wraps the production
+     * [com.vishal.riy.protection.ProtectionEventProcessor] graph and adds the
+     * observation/correlation tier in front of it — one shared pipeline, one
+     * shared state store, one shared lock store and one shared enforcement
+     * engine, not a second copy of any of them.
      */
-    private val protection: ProtectionEventProcessor by lazy {
-        ProtectionEventProcessor.forContext(this)
+    private val intelligence: ProtectionIntelligence by lazy {
+        ProtectionIntelligence.forContext(this)
     }
 
     /**
@@ -152,7 +144,7 @@ class BlockerVpnService : VpnService() {
                     // This is the existing recovery orchestrator, not a new
                     // one, and it touches no deadline.
                     runCatching {
-                        ProtectionEventProcessor.recoveryForContext(this).recover()
+                        ProtectionIntelligence.recoveryForContext(this).recover()
                     }.onFailure { e ->
                         Log.w(TAG, "recovery on sticky restart failed: ${e.message}")
                     }
@@ -357,25 +349,33 @@ class BlockerVpnService : VpnService() {
     // ------------------------------------------------------------- detection
 
     /**
-     * THE DETECTION POINT submits one normalised protection event and nothing
-     * more. The blocking answer itself (0.0.0.0) has already been written by
-     * [processPacket]; every consequence of this observation — the risk grade,
-     * the policy decision, the session, the 2-hour deadline and the platform
-     * restriction — is owned further down the existing chain and is reached
-     * through [ProtectionEventProcessor].
+     * THE DETECTION POINT hands one observation to the intelligence layer and
+     * nothing more. The blocking answer itself (0.0.0.0) has already been
+     * written by [processPacket]; every consequence of this observation — the
+     * corroboration verdict, the risk grade, the policy decision, the session,
+     * the 2-hour deadline and the platform restriction — is owned further down
+     * the existing chain.
      *
      * This method therefore owns DETECTION ONLY: it computes no deadline, holds
-     * no state machine and never touches DevicePolicyManager. A failure inside
-     * the pipeline never weakens the DNS block that already happened.
+     * no state machine, performs no correlation itself and never touches
+     * DevicePolicyManager. A null return is the honest "recorded but not yet
+     * evidence" answer for an uncorroborated ambiguous signal — the false
+     * positive guarantee — and never weakens the DNS block that already
+     * happened. A failure inside the pipeline never weakens it either.
      */
     private fun recordPornDetection(domain: String) {
         runCatching {
-            val result = protection.submit(adultDomainLookupEvent(domain, System.currentTimeMillis()))
-            Log.i(
-                TAG,
-                "adult-content detection: '$domain' -> ${result.decision.nextState} " +
-                    "(enforcement=${result.enforcementResult})",
-            )
+            val result = intelligence.onAdultDomainLookup(domain)
+            if (result == null) {
+                Log.i(TAG, "adult-content observation recorded (not yet evidence): '$domain'")
+            } else {
+                Log.i(
+                    TAG,
+                    "adult-content detection: '$domain' -> ${result.decision.nextState} " +
+                        "(evidence=${result.decision.assessment?.evidenceType}, " +
+                        "enforcement=${result.enforcementResult})",
+                )
+            }
         }.onFailure { e ->
             Log.w(TAG, "protection pipeline failed: ${e.javaClass.simpleName}: ${e.message}")
         }

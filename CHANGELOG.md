@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.2.0 - 2026-09-22
+- Phase 10 — Multi-signal protection intelligence with evidence correlation and a zero-confusion UI, feeding the existing Phase 1–9 pipeline (no duplicate authority anywhere)
+- New `protection/intelligence` layer: `BlocklistMatch` (DEFINITIVE/SUSPECT), `SignalObservation` + `ObservationStore` (max 24 observations, persistence holds only `domain | matchClass | timestamp | policyVersion` — no URLs, queries, messages or search text), `ProtectionCorrelationWindow` (5-min window, 60-s repeat dedup mirroring `LockEngine.DEDUP_WINDOW_MS`), `EvidenceCorrelator`, `ProtectionIntelligence`
+- Classification rule: DEFINITIVE (explicit blocklist rule / adult TLD / brand substring) arms immediately; SUSPECT (whole-label token) needs independent corroboration. Ordinary and medical domains (`sussex.ac.uk`, `adultswim.com`, `xxxlutz.com`, `mayoclinic.org`) never match
+- Correlation: backward-looking only; corroboration only among SUSPECTs (distinct domain within 5 min, or same domain ≥60 s apart); definitive observations never corroborate suspects; duplicates inside the dedup window produce no new event
+- New evidence type `ProtectionEvidenceType.CORROBORATED_ADULT_CONTENT`; `DefaultRiskEngine` gained an exhaustive CONFIRMED arm; `ProtectionEscalationEngine` now qualifies on `isAdultDomainEvidence && isActionable`
+- Self-healing `ProtectionConsistency`: DETECT → RECONCILE → RESTORE → READ BACK → VERIFY; a divergent session mirror is repaired from the LockEngine deadline and verified on a second read; an unverifiable repair is reported as an ERROR, never as success; expired session with a leftover deadline is not alarmed; LockEngine is never written
+- `DefaultIntegrityEngine` now returns real `policyConsistent`/`sessionConsistent`/`lockTaskConsistent` verdicts (previously hardcoded `true` — genuine defect fixed)
+- Zero-confusion UI: titles "You're Protected" / "Restricted Mode" / "Extra Protection" / "Restoring Protection" / "Protection Needs Attention"; precedence mismatch → recovering → HARDENED → restricted → protected; shared `ProtectionDetailsCard`; friendly app labels (never package names); one countdown from `LockEngine.formatRemainingBrief()`; no pause/bypass/disable control anywhere; no developer state name reaches a title
+- 315 unit tests + 3 instrumented tests passing; debug (19 MB) and release (13 MB) APKs built locally
+- Separate finding: no update checker exists in the tracked tree (deleted in v2.0.0); not resurrected
+
 ## v2.1.0 - 2026-09-21
 - Phase 7 — Protection UI integration. The Compose UI now observes the REAL backend protection state through a one-way data flow: `authoritative backend → ProtectionStateBridge → ProtectionUiState → Compose UI`. The UI is rendering-only; it can never become a security authority
 - New `DefaultProtectionStateBridge`: the single read-only translator combining the protection state store, the LockEngine/LockStore deadline (sole authority), the live enforcement read-back, the integrity engine, the app-policy resolver and the event store. It writes nothing, computes no deadline and exposes no disable/pause/bypass

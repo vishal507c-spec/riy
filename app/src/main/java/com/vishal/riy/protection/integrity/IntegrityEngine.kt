@@ -5,6 +5,12 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import com.vishal.riy.admin.RiyDeviceAdminReceiver
+import com.vishal.riy.protection.enforcement.AndroidEnforcementEngine
+import com.vishal.riy.protection.enforcement.PackageManagerAppPolicyResolver
+import com.vishal.riy.protection.enforcement.platform.AndroidDevicePolicyBoundary
+import com.vishal.riy.protection.enforcement.platform.AndroidPackageDiscoveryBoundary
+import com.vishal.riy.protection.intelligence.ProtectionConsistency
+import com.vishal.riy.protection.state.PrefsProtectionStateStore
 import com.vishal.riy.protection.integrity.FreezerProtectionMonitor.ProtectionLevel
 
 /**
@@ -30,6 +36,7 @@ fun interface IntegrityEngine {
 
 class DefaultIntegrityEngine(
     private val context: Context,
+    private val consistency: ProtectionConsistency = ProtectionConsistency.forContext(context),
 ) : IntegrityEngine {
 
     override fun check(): IntegrityStatus {
@@ -95,19 +102,39 @@ class DefaultIntegrityEngine(
             issues += IntegrityIssue(PackageIntegrityEngine.COMPONENT_PACKAGE, "Package is suspended", IntegrityIssue.Severity.ERROR)
         }
 
-        val overallVerified = issues.none { it.severity == IntegrityIssue.Severity.ERROR || it.severity == IntegrityIssue.Severity.CRITICAL }
+        // PROTECTION-LEVEL CONSISTENCY — the Phase 10 self-healing pass. The
+        // three booleans below are now REAL verdicts instead of constants: the
+        // persisted session, the authoritative LockEngine deadline and the live
+        // platform enforcement are compared, a divergent mirror is repaired and
+        // read back, and anything that could not be verified is reported as an
+        // issue rather than claimed healthy. The deadline itself is never
+        // written from here (see ProtectionConsistency).
+        val consistencyReport = try {
+            consistency.verify()
+        } catch (_: Throwable) {
+            null
+        }
+        if (consistencyReport == null) {
+            issues += IntegrityIssue(
+                COMPONENT_CONSISTENCY,
+                "protection consistency check failed; reporting every consistency verdict as unverified",
+                IntegrityIssue.Severity.ERROR,
+            )
+        } else {
+            issues += consistencyReport.issues
+        }
 
         return IntegrityStatus(
             deviceOwnerActive = deviceOwnerActive,
             uninstallProtectionActive = uninstallBlocked,
-            policyConsistent = true,
-            sessionConsistent = true,
-            lockTaskConsistent = true,
+            policyConsistent = consistencyReport?.policyConsistent ?: false,
+            sessionConsistent = consistencyReport?.sessionConsistent ?: false,
+            lockTaskConsistent = consistencyReport?.lockTaskConsistent ?: false,
             issues = issues,
         )
     }
 
     private companion object {
-        // Constants moved to PackageIntegrityEngine to avoid conflicts
+        const val COMPONENT_CONSISTENCY = "protection_consistency"
     }
 }

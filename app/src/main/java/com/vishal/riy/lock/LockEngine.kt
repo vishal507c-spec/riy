@@ -78,6 +78,23 @@ object LockEngine {
         val seconds = totalSeconds % 60L
         return String.format(java.util.Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
     }
+
+    /**
+     * The same deadline, in the brief human form the Phase 10 UI shows large:
+     * "1h 42m", or "42m" when under an hour. Minutes are never negative and
+     * never shown as zero — the deadline this formats is always the
+     * authoritative one from [remainingMillis], so this method stays a
+     * formatter and owns no countdown of its own.
+     */
+    fun formatRemainingBrief(millis: Long): String {
+        val totalMinutes = (millis / 60_000L).coerceAtLeast(0L)
+        val hours = totalMinutes / 60L
+        val minutes = totalMinutes % 60L
+        return when {
+            hours > 0L -> String.format(java.util.Locale.US, "%dh %02dm", hours, minutes)
+            else -> String.format(java.util.Locale.US, "%dm", minutes.coerceAtLeast(1L))
+        }
+    }
 }
 
 /**

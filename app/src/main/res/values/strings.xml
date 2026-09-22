@@ -2,19 +2,6 @@
     <string name="app_name">Riy</string>
     <string name="app_version_label">Version %1$s</string>
 
-    <!-- Shield glyph used by the protection + lock screens. -->
-    <string name="app_shield">🛡️</string>
-
-    <!-- Protection status (always the REAL service state) -->
-    <string name="status_protection_on">Porn Protection ON</string>
-    <string name="status_protection_off">Porn Protection OFF</string>
-    <string name="status_connecting">Starting protection…</string>
-    <string name="status_protection_failed">Protection FAILED</string>
-    <string name="status_detail_active">Adult sites are blocked system-wide and search-engine SafeSearch is enforced at DNS level.</string>
-    <string name="status_detail_connecting">Activating the VPN filter…</string>
-    <string name="status_detail_failed">The filter could not start (VPN permission revoked or another VPN is active). Tap Enable Protection to retry.</string>
-    <string name="status_detail_off">No filtering is running right now.</string>
-
     <!-- Actions -->
     <string name="action_enable_protection">Enable Protection</string>
 
@@ -24,25 +11,69 @@
     <string name="blocker_notification_title">Protection is ON</string>
     <string name="blocker_notification_text">Adult websites are being blocked</string>
 
-    <!-- 2-hour lock -->
-    <string name="lock_shield">🛡️</string>
-    <string name="lock_protection_active">Protection Active</string>
-    <string name="lock_detected">Porn search detected.</string>
-    <string name="lock_hint">Use this time to step away from the urge.</string>
+    <!--
+        ZERO-CONFUSION UI (Phase 10).
 
-    <!-- Protection modes (the authoritative ProtectionState, shown verbatim) -->
-    <string name="mode_restricted">Restricted Mode</string>
-    <string name="mode_hardened">Hardened Mode</string>
-    <string name="mode_normal">Protected</string>
+        Everything a user sees is written in plain human language. The internal
+        protection states (NORMAL / SUSPICIOUS / CONFIRMED / RESTRICTED /
+        HARDENED / RECOVERY) are NEVER shown verbatim, and neither is any engine
+        name, package name, domain, DNS fact, score or evidence id.
+    -->
 
-    <string name="restricted_detail">Protection is active. Adult sites are blocked and only allowed apps are available.</string>
-    <string name="hardened_detail">Protection has been strengthened after repeated detections.</string>
-    <string name="recovery_title">Restoring Protection…</string>
-    <string name="recovery_detail">Protection is being restored. This screen cannot be dismissed.</string>
-    <string name="mismatch_title">Protection Warning</string>
-    <string name="mismatch_detail">Protection is required but could not be fully verified on this device. There is no way to disable it from here.</string>
+    <!-- One large status title per situation -->
+    <string name="status_protected_title">You\'re Protected</string>
+    <string name="status_protected_detail">RIY is protecting this device.</string>
 
-    <!-- Honest enforcement / integrity status line -->
+    <string name="status_restricted_title">Restricted Mode</string>
+    <string name="status_restricted_detail">RIY is temporarily limiting this device.</string>
+
+    <string name="status_hardened_title">Extra Protection</string>
+    <string name="status_hardened_detail">RIY has strengthened protection after repeated protection triggers.</string>
+
+    <string name="status_recovery_title">Restoring Protection</string>
+    <string name="status_recovery_detail">RIY is restoring your protection.\nPlease wait.</string>
+
+    <string name="status_mismatch_title">Protection Needs Attention</string>
+    <string name="status_mismatch_detail">RIY detected that protection needs to be restored.\nRIY is working to restore your protection.</string>
+
+    <!-- The single primary status card line -->
+    <string name="protection_active_line">Protection Active</string>
+    <string name="protection_active_normal">Protection is running normally.</string>
+    <string name="protection_active_restricted">Some apps are temporarily unavailable.</string>
+    <string name="protection_active_hardened">Restricted Mode is still active.</string>
+
+    <!-- Countdown -->
+    <string name="time_remaining_label">remaining</string>
+
+    <!-- Available apps during a restriction: friendly names only -->
+    <string name="available_now_label">Available right now</string>
+    <string name="app_name_phone">Phone</string>
+    <string name="app_name_wallet">Wallet</string>
+    <string name="app_name_riy">RIY</string>
+    <string name="app_name_emergency">Emergency</string>
+    <string name="app_name_keyboard">Keyboard</string>
+
+    <!-- Truthful, percentage-free recovery progress -->
+    <string name="recovery_step_checking">Checking protection…</string>
+    <string name="recovery_step_restoring">Restoring device restrictions…</string>
+    <string name="recovery_step_verifying">Verifying protection…</string>
+
+    <!-- Optional explanation -->
+    <string name="explanation_why">Why is this happening?</string>
+    <string name="explanation_restricted">RIY detected activity that triggered protection.\nThe restriction will end automatically when the timer reaches zero.</string>
+
+    <!-- Optional Protection Details: technical states translated to normal language -->
+    <string name="details_section">Protection Details</string>
+    <string name="details_device">Device protection</string>
+    <string name="details_apps">App restrictions</string>
+    <string name="details_network">Network protection</string>
+    <string name="details_integrity">Integrity verified</string>
+
+    <string name="state_active">Active</string>
+    <string name="state_applying">Applying…</string>
+    <string name="state_unavailable">Unavailable</string>
+
+    <!-- Honest status line, never a reassuring default -->
     <string name="enforcement_verified">Enforcement verified</string>
     <string name="enforcement_pending">Enforcement being applied…</string>
     <string name="enforcement_mismatch">Enforcement not verified</string>
@@ -50,9 +81,9 @@
     <string name="integrity_uninstall_active">Uninstall protection active</string>
     <string name="integrity_unavailable">Protection status unverified</string>
 
-    <!-- Allowed apps during a restriction -->
-    <string name="allowed_apps_label">Allowed apps</string>
-
-    <!-- Time remaining until the authoritative deadline -->
-    <string name="time_remaining_label">Time remaining</string>
+    <!-- Honest network filter status -->
+    <string name="filter_on">Adult sites are blocked system-wide.</string>
+    <string name="filter_connecting">Activating the VPN filter…</string>
+    <string name="filter_failed">The filter could not start. Tap Enable Protection to retry.</string>
+    <string name="filter_off">No filtering is running right now.</string>
 </resources>

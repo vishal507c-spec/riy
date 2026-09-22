@@ -26,37 +26,56 @@ class Blocklist(rules: List<String> = emptyList()) {
     val ruleCount: Int get() = exactDomains.size
 
     /** True when the DNS query for [domain] must be blocked. */
-    fun contains(domain: String?): Boolean {
-        if (domain.isNullOrBlank()) return false
+    fun contains(domain: String?): Boolean = classify(domain) != null
+
+    /**
+     * Phase 10 — classifies HOW [domain] matched, without changing whether it
+     * did. [contains] is now a thin wrapper over this, so the two can never
+     * disagree about what is blocked.
+     *
+     * The match class is the intelligence layer's only input for its
+     * false-positive tiering (see [BlocklistMatch]): a
+     * [DEFINITIVE][BlocklistMatch.DEFINITIVE] match is evidence on its own; a
+     * [SUSPECT][BlocklistMatch.SUSPECT] match is an observation that needs
+     * independent corroboration before it may become a protection event.
+     */
+    fun classify(domain: String?): BlocklistMatch? {
+        if (domain.isNullOrBlank()) return null
         val host = normalizeDomain(domain)
-        if (!host.contains('.')) return false
-        if (host in exactDomains) return true
+        if (!host.contains('.')) return null
+        if (host in exactDomains) return BlocklistMatch.DEFINITIVE
         // Walk up the parent labels: any.sub.xvideos.com -> xvideos.com.
         var current = host
         while (true) {
             val dot = current.indexOf('.')
             if (dot <= 0 || dot == current.length - 1) break
             current = current.substring(dot + 1)
-            if (current in exactDomains) return true
+            if (current in exactDomains) return BlocklistMatch.DEFINITIVE
         }
-        return matchesByHeuristic(host)
+        return classifyByHeuristic(host)
     }
 
-    private fun matchesByHeuristic(host: String): Boolean {
+    /**
+     * The heuristic arm, split by strength. Every rule below is one the matcher
+     * already applied; this only reports WHICH one fired.
+     */
+    private fun classifyByHeuristic(host: String): BlocklistMatch? {
         val labels = host.split('.')
-        if (labels.size < 2) return false
-        if (labels.last() in ADULT_TLDS) return true
+        if (labels.size < 2) return null
+        if (labels.last() in ADULT_TLDS) return BlocklistMatch.DEFINITIVE
 
         // Substring keywords are safe on the FULL host: no innocent domain or
         // subdomain contains them (catches freeporn.example.com etc.).
-        if (SUBSTRING_KEYWORDS.any { host.contains(it) }) return true
+        if (SUBSTRING_KEYWORDS.any { host.contains(it) }) return BlocklistMatch.DEFINITIVE
 
         // Token keywords must match a WHOLE label of the registrable part
         // (last two labels, or three for multi-part suffixes like co.uk) so
         // "sussex.ac.uk", "adultswim.com" or "xxxlutz.com" stay allowed.
+        // This is the ONLY ambiguous class, so it is reported as SUSPECT.
         val skippable = { l: String -> l == "com" || l == "co" || l == "org" || l == "net" }
         val baseCount = if (labels.size >= 3 && skippable(labels[labels.size - 2])) 3 else 2
-        return labels.takeLast(baseCount).any { it in TOKEN_LABELS }
+        return if (labels.takeLast(baseCount).any { it in TOKEN_LABELS }) BlocklistMatch.SUSPECT
+        else null
     }
 
     companion object {

@@ -65,9 +65,13 @@ class ProtectionEscalationEngine(
     fun record(event: ProtectionEvent, assessment: RiskAssessment): EscalationDecision {
         val now = clock()
 
-        // Only the one genuine evidence type counts. This is an exhaustive
-        // check against the closed enum, so a fabricated source has no way in.
-        val qualifies = event.evidenceType == QUALIFYING_EVIDENCE &&
+        // Only a genuine adult-domain observation counts. The check is the
+        // closed enum's own predicate, so the escalation threshold can never be
+        // reached by a fabricated or unrelated signal, and the two adult-domain
+        // tiers (a direct blocklist match and a corroborated ambiguous signal)
+        // both count once each — never double for one episode, because the
+        // intelligence layer produces exactly one event per correlated episode.
+        val qualifies = event.evidenceType.isAdultDomainEvidence &&
             assessment.isActionable
 
         if (!qualifies) {
@@ -145,16 +149,6 @@ class ProtectionEscalationEngine(
         state.eventTimestamps.count { it >= now - windowMillis() }
 
     private fun windowMillis(): Long = policy.escalationWindow.inWholeMilliseconds
-
-    private companion object {
-
-        /**
-         * The single legitimate evidence that counts toward escalation, per the
-         * existing closed enum.
-         */
-        val QUALIFYING_EVIDENCE: ProtectionEvidenceType =
-            ProtectionEvidenceType.ADULT_DOMAIN_DNS_LOOKUP
-    }
 }
 
 /**

@@ -2,6 +2,7 @@ package com.vishal.riy.blocker
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -173,5 +174,58 @@ class BlocklistTest {
     @Test
     fun `ruleCount reports loaded rules`() {
         assertEquals(7, blocklist.ruleCount)
+    }
+
+    // ------------------------------------------- Phase 10 match classification
+
+    @Test
+    fun `an explicit rule, an adult TLD and a brand substring are all DEFINITIVE`() {
+        assertEquals(BlocklistMatch.DEFINITIVE, blocklist.classify("pornhub.com"))
+        assertEquals(BlocklistMatch.DEFINITIVE, blocklist.classify("anything.porn"))
+        assertEquals(BlocklistMatch.DEFINITIVE, blocklist.classify("freeporn.com"))
+        assertEquals(BlocklistMatch.DEFINITIVE, blocklist.classify("xvideos.mirror.io"))
+    }
+
+    @Test
+    fun `a whole-label token of the registrable part is SUSPECT`() {
+        // The ambiguous class: plausible, but not positively identified.
+        assertEquals(BlocklistMatch.SUSPECT, blocklist.classify("nude.example"))
+        assertEquals(BlocklistMatch.SUSPECT, blocklist.classify("adult.guru"))
+        assertEquals(BlocklistMatch.SUSPECT, blocklist.classify("nsfw.la"))
+    }
+
+    @Test
+    fun `classify is null for ordinary and medical domains`() {
+        // The false-positive guarantees the blocklist already made, now exposed
+        // through the classification the intelligence layer consumes.
+        assertNull(blocklist.classify("google.com"))
+        assertNull(blocklist.classify("youtube.com"))
+        assertNull(blocklist.classify("sussex.ac.uk"))
+        assertNull(blocklist.classify("adultswim.com"))
+        assertNull(blocklist.classify("xxxlutz.com"))
+        assertNull(blocklist.classify("mayoclinic.org"))
+    }
+
+    @Test
+    fun `classify and contains never disagree about what is blocked`() {
+        listOf(
+            "pornhub.com", "anything.porn", "freeporn.com",
+            "nude.example", "adult.guru", "google.com", "sussex.ac.uk",
+        ).forEach { domain ->
+            val classified = blocklist.classify(domain)
+            assertEquals(
+                "classify must answer contains for '$domain'",
+                classified != null,
+                blocklist.contains(domain),
+            )
+        }
+    }
+
+    @Test
+    fun `malformed and blank input classifies to nothing`() {
+        assertNull(blocklist.classify(null))
+        assertNull(blocklist.classify(""))
+        assertNull(blocklist.classify("localhost"))
+        assertNull(blocklist.classify("   "))
     }
 }

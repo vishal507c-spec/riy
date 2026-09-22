@@ -435,3 +435,34 @@ fun adultDomainLookupEvent(
     confidence = ProtectionEvent.Confidence.CERTAIN,
     metadata = mapOf(ProtectionEvent.META_DOMAIN to domain),
 )
+
+/**
+ * The one Phase 10 addition to the event vocabulary: an ambiguous (whole-label
+ * token) adult-domain signal that
+ * [com.vishal.riy.protection.intelligence.EvidenceCorrelator] has already
+ * corroborated with an independent observation. Built by
+ * [com.vishal.riy.protection.intelligence.ProtectionIntelligence] and consumed
+ * by this processor exactly like the event above — same contract, same
+ * metadata key, same minimum information. No new authority is introduced: the
+ * corroboration was decided upstream by deterministic rules, and the severity
+ * of the resulting event is graded by the existing
+ * [com.vishal.riy.protection.risk.RiskEngine].
+ */
+fun corroboratedAdultContentEvent(
+
+    domain: String,
+
+    now: Long,
+
+    eventId: String = UUID.randomUUID().toString(),
+
+): ProtectionEvent = ProtectionEvent(
+    eventId = eventId,
+    timestamp = now,
+    source = ProtectionEventSource.DNS_FILTER,
+    evidenceType = ProtectionEvidenceType.CORROBORATED_ADULT_CONTENT,
+    // Two independent observations of an ambiguous signal are evidence, not a
+    // probability — no invented score is attached.
+    confidence = ProtectionEvent.Confidence.CERTAIN,
+    metadata = mapOf(ProtectionEvent.META_DOMAIN to domain),
+)

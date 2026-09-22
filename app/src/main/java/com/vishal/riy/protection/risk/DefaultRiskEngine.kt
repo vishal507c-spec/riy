@@ -7,11 +7,20 @@ import com.vishal.riy.protection.event.ProtectionEvidenceType
  * THE production implementation of [RiskEngine], and the smallest one that is
  * honest about what RIY can actually observe.
  *
- * It grades exactly one real signal — a DNS query for an adult domain that the
- * filtering VPN matched before any TLS handshake — and nothing else. HTTPS
+ * It grades exactly the signals the filtering VPN can actually observe — a DNS
+ * query for an adult domain that the blocklist matched before any TLS
+ * handshake — at either of the two strengths that match can have. HTTPS
  * keywords, image content, notifications and screen state are NOT visible to a
  * non-MITM Android app, so this engine never pretends to grade them: there is
  * no heuristic branch, no keyword branch and no arbitrary score.
+ *
+ * THE CORROBORATION RULE IS NOT A SCORE. A
+ * [com.vishal.riy.protection.event.ProtectionEvidenceType.CORROBORATED_ADULT_CONTENT]
+ * event reaches this engine ONLY after
+ * [com.vishal.riy.protection.intelligence.EvidenceCorrelator] found a second,
+ * independent observation. This engine does not re-weigh that decision and it
+ * does not discount it: corroboration is a deterministic yes/no that already
+ * happened upstream, so the assessment below stays a pure function of the event.
  *
  * HARD CONTRACT, unchanged from [RiskEngine]: pure Kotlin, deterministic given
  * the same event, no Android API, no storage, no state transition. This class
@@ -44,6 +53,23 @@ class DefaultRiskEngine : RiskEngine {
             reasoning = REASON_ADULT_DOMAIN_DNS_LOOKUP,
             event = event,
         )
+
+        /**
+         * A token-class match that was independently corroborated inside the
+         * detection window. The corroboration already happened upstream — this
+         * arm treats the event as the confirmed observation it now is, with no
+         * further discounting, so a corroborated signal and a direct blocklist
+         * match reach the policy engine at the same severity. That is what
+         * keeps one weak observation from being both necessary and insufficient
+         * at the same time.
+         */
+        ProtectionEvidenceType.CORROBORATED_ADULT_CONTENT -> RiskAssessment(
+            riskLevel = RiskLevel.CONFIRMED,
+            confidence = event.confidence,
+            evidenceType = event.evidenceType,
+            reasoning = REASON_CORROBORATED_ADULT_CONTENT,
+            event = event,
+        )
     }
 
     private companion object {
@@ -55,5 +81,8 @@ class DefaultRiskEngine : RiskEngine {
          */
         const val REASON_ADULT_DOMAIN_DNS_LOOKUP =
             "adult-domain DNS lookup matched the blocklist"
+
+        const val REASON_CORROBORATED_ADULT_CONTENT =
+            "ambiguous adult-domain signal corroborated by an independent observation"
     }
 }
