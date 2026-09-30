@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Needed by the filtering VPN service to reach upstream DNS resolvers. -->
+    <!-- Needed by the filtering VPN service to reach upstream DNS resolvers,
+         and by the auto-updater to reach the GitHub Releases API. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required on API 26+ to install an APK the app downloaded itself.
+         Android still enforces signature checks at install time. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Content blocker: persistent foreground VPN service + reboot restore. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -128,5 +132,18 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- FileProvider used to hand the downloaded, verified update APK to the
+             system package installer. The file lives in app-private storage
+             (no world-readable files, no broad storage permission). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

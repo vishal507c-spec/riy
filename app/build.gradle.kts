@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,7 +7,7 @@ plugins {
 }
 
 /**
- * Versioning strategy:
+ * Versioning strategy (mirrors com.vishal.riy.update.VersionUtils — keep in sync):
  *
  *   versionCode = major * 1_000_000 + minor * 1_000 + patch
  *
@@ -29,6 +31,35 @@ fun versionNameFromTag(tag: String?): String = tag?.trim()?.removePrefix("v")?.r
 val releaseTag: String? = (project.findProperty("versionTag") as String?)?.trim()?.takeIf { it.isNotBlank() }
 val computedVersionName = versionNameFromTag(releaseTag)
 val computedVersionCode = versionCodeFromTag(releaseTag)
+
+/**
+ * Fine-grained GitHub PAT for reading the PRIVATE repository releases + assets.
+ * Loaded ONLY from LOCAL config (never committed / never hard-coded):
+ *   1. env var GITHUB_TOKEN
+ *   2. Gradle property GITHUB_TOKEN (gradle.properties or -P)
+ *   3. local.properties key GITHUB_TOKEN (gitignored, most convenient)
+ * Returns "" when not configured, so builds without a token simply skip
+ * authenticated update checks gracefully (public/anonymous request no-ops).
+ */
+fun githubToken(): String {
+    val env = System.getenv("GITHUB_TOKEN")
+    if (!env.isNullOrBlank()) return env.trim()
+    val prop = (project.findProperty("GITHUB_TOKEN") as String?)?.takeIf { it.isNotBlank() }
+    if (prop != null) return prop.trim()
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) {
+        val props = Properties()
+        localFile.inputStream().use { props.load(it) }
+        val fromFile = props.getProperty("GITHUB_TOKEN")?.takeIf { it.isNotBlank() }
+        if (fromFile != null) return fromFile.trim()
+    }
+    return ""
+}
+
+fun escapeForJavaString(s: String): String =
+    s.replace("\\", "\\\\").replace("\"", "\\\"")
+
+val gitHubToken: String = githubToken()
 
 android {
     namespace = "com.vishal.riy"
@@ -76,6 +107,9 @@ android {
 
     buildTypes {
         debug {
+            // Token injected for local test builds (same local-config mechanism as
+            // release) so the app can self-update from the PRIVATE GitHub repo.
+            buildConfigField("String", "GITHUB_TOKEN", "\"${escapeForJavaString(gitHubToken)}\"")
             // Use the SAME repository-controlled signing identity as release so local
             // debug APKs and CI release APKs share one deterministic certificate.
             // This never falls back to the machine-specific ~/.android/debug.keystore,
@@ -84,6 +118,10 @@ android {
         }
         release {
             isMinifyEnabled = false
+            // Release artifacts also carry the token (same local-config mechanism as
+            // debug) so the app can self-update from the PRIVATE GitHub repository.
+            // Injected in CI from the ANDROID_PRIVATE_PAT secret; never hard-coded.
+            buildConfigField("String", "GITHUB_TOKEN", "\"${escapeForJavaString(gitHubToken)}\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("releaseFallback")
         }
@@ -124,6 +162,9 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")
+    // org.json ships with Android; this copy is only for local JVM unit tests
+    // (update ReleaseInfo parsing tests).
+    testImplementation("org.json:json:20240303")
 
     // On-device instrumented tests (real Compose UI on a device/emulator):
     // these verify that the lock screen appears and cannot be backed out of.

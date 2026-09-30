@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.1 - 2026-10-01
+- Restored the GitHub auto-update system removed in v2.0.0 (exact v1.2.1 implementation): startup update check against `GET /repos/{owner}/{repo}/releases/latest`, numeric version comparison, draft/prerelease rejection, pinned-repo APK asset validation, authenticated private-repo download with trusted-CDN redirect allowlist, APK verification (package name + no downgrade) and handoff to the system installer via FileProvider
+- Throttled to one lightweight check per interval; every failure mode no-ops gracefully and never breaks the app
+- 20 update unit tests (release parsing, version math, download helpers) restored alongside the existing protection test suite
+
 ## v2.2.0 - 2026-09-22
 - Phase 10 — Multi-signal protection intelligence with evidence correlation and a zero-confusion UI, feeding the existing Phase 1–9 pipeline (no duplicate authority anywhere)
 - New `protection/intelligence` layer: `BlocklistMatch` (DEFINITIVE/SUSPECT), `SignalObservation` + `ObservationStore` (max 24 observations, persistence holds only `domain | matchClass | timestamp | policyVersion` — no URLs, queries, messages or search text), `ProtectionCorrelationWindow` (5-min window, 60-s repeat dedup mirroring `LockEngine.DEDUP_WINDOW_MS`), `EvidenceCorrelator`, `ProtectionIntelligence`
