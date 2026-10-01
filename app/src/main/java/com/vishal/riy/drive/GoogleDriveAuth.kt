@@ -34,6 +34,27 @@ object GoogleDriveAuth {
         null
     }
 
+    /**
+     * The platform's currently signed-in account for THESE sign-in options, or
+     * null when nobody is signed in. Synchronous, no UI, never throws. This is
+     * the first silent-session check: a returning user is recognised here
+     * WITHOUT any account picker.
+     */
+    fun lastSignedIn(context: Context): GoogleSignInAccount? = try {
+        GoogleSignIn.getLastSignedInAccount(context.applicationContext)
+    } catch (_: Exception) {
+        null
+    }
+
+    /**
+     * Drops one rejected access token from the platform cache so the next
+     * [accessToken] call mints a fresh one (the standard expired-token
+     * recovery: 401 → clearToken(rejected) → retry once). Never throws.
+     */
+    fun invalidateToken(context: Context, token: String) {
+        runCatching { GoogleAuthUtil.clearToken(context.applicationContext, token) }
+    }
+
     /** Google-account handle used by GoogleAuthUtil. */
     fun toAndroidAccount(email: String): Account = Account(email, "com.google")
 

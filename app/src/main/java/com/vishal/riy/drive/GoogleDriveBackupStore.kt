@@ -50,7 +50,23 @@ class GoogleDriveBackupStore(
         url: URL,
         body: ByteArray? = null,
         contentType: String? = null,
+    ): Resp = requestOnce(method, url, body, contentType, authRetry = true)
+
+    /**
+     * Single request with exactly one silent auth recovery: a 401/403 means
+     * the cached access token is stale/rejected, so it is dropped via
+     * `clearToken` and the request is retried ONCE with a freshly minted
+     * token. Only a second 401/403 (revoked consent, removed account, …)
+     * surfaces to the caller as a genuine re-authentication signal.
+     */
+    private fun requestOnce(
+        method: String,
+        url: URL,
+        body: ByteArray?,
+        contentType: String?,
+        authRetry: Boolean,
     ): Resp {
+        val usedToken = token()
         val conn = url.openConnection() as HttpURLConnection
         try {
             conn.requestMethod = method
@@ -59,13 +75,19 @@ class GoogleDriveBackupStore(
             conn.doInput = true
             if (body != null) conn.doOutput = true
             // Fresh platform-refreshed token per request; never logged.
-            conn.setRequestProperty("Authorization", "Bearer ${token()}")
+            conn.setRequestProperty("Authorization", "Bearer $usedToken")
             conn.setRequestProperty("Accept", "*/*")
             if (contentType != null) conn.setRequestProperty("Content-Type", contentType)
             if (body != null) {
                 conn.outputStream.use { it.write(body); it.flush() }
             }
             val code = conn.responseCode
+            if ((code == 401 || code == 403) && authRetry) {
+                // Stale/rejected token: invalidate the ONE token that failed
+                // and retry a single time with a fresh one.
+                GoogleDriveAuth.invalidateToken(ctx, usedToken)
+                return requestOnce(method, url, body, contentType, authRetry = false)
+            }
             val stream = if (code in 200..299) conn.inputStream else conn.errorStream
             val bytes = stream?.readBytes() ?: ByteArray(0)
             return Resp(code, bytes)

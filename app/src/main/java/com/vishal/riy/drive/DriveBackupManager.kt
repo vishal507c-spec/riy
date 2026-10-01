@@ -292,6 +292,60 @@ class DriveBackupManager(private val appContext: Context) {
         RiyDriveConfig.enabled && prefs.getString(KEY_ACCOUNT, null).isNullOrBlank()
     }
 
+    /**
+     * Silent session validation for startup: the persisted session counts as
+     * valid ONLY when (a) an account email is stored, (b) the platform still
+     * holds a signed-in Google session for the SAME account, and (c) a fresh
+     * access token is actually obtainable right now. `GoogleAuthUtil`
+     * transparently refreshes an expired access token behind the scenes, so a
+     * refreshable expiry still validates silently. The email alone is never
+     * trusted as proof of authentication.
+     *
+     * On success the coordinator is re-attached when missing. Never throws.
+     */
+    suspend fun validateStoredSession(): Boolean = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val email = prefs.getString(KEY_ACCOUNT, null)?.trim()?.takeIf { it.isNotEmpty() }
+                ?: return@withContext false
+            val platformEmail = GoogleDriveAuth.lastSignedIn(appContext)?.email
+            if (!email.equals(platformEmail?.trim(), ignoreCase = true)) return@withContext false
+            // Proof of a live session: a token must be obtainable NOW.
+            GoogleDriveAuth.accessToken(appContext, email)
+            if (coordinator == null) attachCoordinator(email)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Explicit logout: signs the platform session out and drops every
+     * account-scoped key (account, folder id, provisioning, pending queue).
+     * Local protection data is NEVER touched — only the Drive link is cut.
+     * The next launch will genuinely require the account picker again.
+     */
+    suspend fun signOut(): Boolean = withContext(Dispatchers.IO) {
+        return@withContext try {
+            runCatching {
+                com.google.android.gms.tasks.Tasks.await(
+                    com.google.android.gms.auth.api.signin.GoogleSignIn
+                        .getClient(appContext, GoogleDriveAuth.signInOptions())
+                        .signOut(),
+                )
+            }
+            prefs.edit()
+                .remove(KEY_ACCOUNT).remove(KEY_NAME).remove(KEY_PHOTO)
+                .remove(KEY_FOLDER).remove(KEY_FOLDER_ACCOUNT).remove(KEY_PROVISIONED)
+                .remove(KEY_SYNC_SHA).remove(KEY_SYNC_GEN)
+                .remove(KEY_SYNC_AT).remove(KEY_SYNC_ATTEMPTS)
+                .apply()
+            coordinator = null
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     /** Remembers the authorized account and wires the coordinator. Never stores tokens. */
     suspend fun connectDrive(email: String, displayName: String? = null, photoUrl: String? = null) =
         withContext(Dispatchers.IO) {

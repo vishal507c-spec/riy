@@ -118,8 +118,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Silent-first Drive bootstrap: the interactive account picker is the LAST
+     * resort, shown only when no existing session can be restored. Order:
+     *  1. re-attach remembered wiring (no UI);
+     *  2. validate the persisted session silently (stored email + live
+     *     platform session for the same account + obtainable token) → enter;
+     *  3. adopt a platform silent sign-in (fresh install, grant still held) → enter;
+     *  4. ONLY then launch the account picker.
+     * Every step is best-effort; protection never depends on Drive.
+     */
     private suspend fun runDriveBootstrap() {
         runCatching { driveManager.reconcileOnStartup() }
+        if (runCatching { restoreDriveSessionSilently() }.getOrDefault(false)) {
+            runCatching { driveManager.autoRestoreIfNeeded() }
+            runCatching { driveManager.reconcileAndCatchUp() }
+            return
+        }
         if (runCatching { driveManager.driveNeedsAuthorization() }.getOrDefault(false)) {
             // ActivityResultLauncher must launch on the main thread.
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -129,6 +144,33 @@ class MainActivity : AppCompatActivity() {
         }
         runCatching { driveManager.autoRestoreIfNeeded() }
         runCatching { driveManager.reconcileAndCatchUp() }
+    }
+
+    /**
+     * Restores the Drive session WITHOUT any UI. Returns true when the app may
+     * enter directly: either the persisted session re-validates, or the
+     * platform grants a silent sign-in that is immediately adopted. A `false`
+     * means re-authentication is genuinely required (revoked/removed account,
+     * no grant, offline, …) and the caller must show the picker.
+     */
+    private suspend fun restoreDriveSessionSilently(): Boolean {
+        // 1. Returning user: persisted + live + provably valid session.
+        if (runCatching { driveManager.validateStoredSession() }.getOrDefault(false)) {
+            return true
+        }
+        // 2. Adoptable platform session (never invent one: silentSignIn either
+        //    yields a real authenticated account or throws).
+        return try {
+            val account = com.google.android.gms.tasks.Tasks.await(
+                googleSignInClient.silentSignIn(),
+            )
+            val email = account.email ?: return false
+            driveManager.connectDrive(email, account.displayName, account.photoUrl?.toString())
+            driveManager.finalizeProvisioning()
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun handleDriveSignInResult(data: android.content.Intent?) {

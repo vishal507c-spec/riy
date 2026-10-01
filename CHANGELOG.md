@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.4.1 - 2026-10-01
+- Fix Drive login persistence: silent-first session restore (stored + platform + token validation), platform silent sign-in adoption, single-retry 401 token refresh, explicit sign-out — account picker now appears only when re-authentication is genuinely required
+
 ## v2.4.0 - 2026-10-01
 - Sci-fi cockpit UI: always-dark deep-space theme, neon-cyan holograms, plasma-magenta lockdown, targeting-corner brackets, radar scan-sweep animation, glowing status orb, terminal-monospace countdown
 - Synthesized soundboard (offline, bundled WAVs): UI blip, shield engage sweep, lockdown klaxon, release chime — all fire-and-forget, never break protection logic
