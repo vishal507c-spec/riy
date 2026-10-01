@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.3.1 - 2026-10-01
+- Fix scheduler wiring compile error in MainActivity (backup lambda passed as named `backupFn`)
+
 ## v2.3.0 - 2026-10-01
 - Google Drive backup for protection state (cloned from the reference app's data platform): all six SharedPreferences stores (lock deadline, session, events, escalation, observations, VPN intent) snapshot into one canonical SHA-256-bound JSON VAULT in a dedicated `RiyBackup` Drive folder, plus `_latest_verified.json` pointer
 - Secretless OAuth (Google Sign-In + `drive.file` scope, no hardcoded secrets); search-before-create folder resolver per account; candidate → verify → promote → confirm publication with anti-rollback and same-generation conflict preservation

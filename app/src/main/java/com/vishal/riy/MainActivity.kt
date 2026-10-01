@@ -82,9 +82,10 @@ class MainActivity : AppCompatActivity() {
     private fun installDriveBackup() {
         try {
             com.vishal.riy.drive.DriveSync.install(
-                com.vishal.riy.drive.DriveBackupScheduler(driveScope) {
-                    driveManager.backupAfterTransaction()
-                },
+                com.vishal.riy.drive.DriveBackupScheduler(
+                    scope = driveScope,
+                    backupFn = { driveManager.backupAfterTransaction() },
+                ),
             )
         } catch (_: Exception) {
             // Drive must never break startup.
