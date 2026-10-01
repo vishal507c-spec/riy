@@ -2,7 +2,11 @@
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -31,6 +35,15 @@ fun RiyApp() {
         // A locked user cannot back out of the lock screen. Recovery is equally
         // non-dismissible: the backend is mid-restore and must not be bypassed.
         val lockActive = state.isRestricted || state.isRecovering
+
+        // Sci-fi klaxon on lockdown, deactivation chime on release. Sound only;
+        // the restriction itself is still armed/cleared by the backend deadline.
+        var wasLocked by rememberSaveable { mutableStateOf(false) }
+        LaunchedEffect(lockActive) {
+            if (lockActive && !wasLocked) SciFiSound.alarm()
+            if (!lockActive && wasLocked) SciFiSound.release()
+            wasLocked = lockActive
+        }
 
         BackHandler(enabled = lockActive) { /* intentionally consumed */ }
 

@@ -50,6 +50,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Cockpit soundboard (best-effort; never blocks startup).
+        com.vishal.riy.ui.SciFiSound.init(this)
         setContent { RiyApp() }
         updatePreferences = UpdatePreferences(this)
         scheduleUpdateCheck()

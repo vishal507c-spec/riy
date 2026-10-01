@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -67,13 +68,17 @@ fun LockScreen(
     modifier: Modifier = Modifier,
 ) {
     val presentation = state.userFacing()
+    val alertColor = if (state.enforcementMismatch) SciFiColors.AlertRed else SciFiColors.Plasma
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(colorScheme.background),
-        contentAlignment = Alignment.Center,
+    SciFiFrame(
+        header = "R.I.Y. // LOCKDOWN PROTOCOL",
+        headerColor = alertColor,
+        modifier = modifier.background(colorScheme.background),
     ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
         Column(
             modifier = Modifier
                 .padding(28.dp)
@@ -81,9 +86,12 @@ fun LockScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            StatusIcon(presentation.icon)
+            StatusIcon(presentation.icon, alertColor)
 
             Spacer(Modifier.height(12.dp))
+
+            // Cockpit scanner dressing; the countdown below stays the one deadline.
+            ScanSweep(color = alertColor)
 
             // 1. One large title.
             Text(
@@ -143,6 +151,7 @@ fun LockScreen(
                 color = colorScheme.onSurfaceVariant,
             )
         }
+        }
     }
 }
 
@@ -151,10 +160,14 @@ fun LockScreen(
  * reassure where the backend has not verified something.
  */
 @Composable
-private fun StatusIcon(icon: androidx.compose.ui.graphics.vector.ImageVector) {
+private fun StatusIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    glow: Color = SciFiColors.Plasma,
+) {
     Box(
         modifier = Modifier
             .size(96.dp)
+            .shadow(28.dp, CircleShape, ambientColor = glow)
             .background(colorScheme.primaryContainer, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
@@ -284,7 +297,10 @@ private fun WhyIsThisHappening(state: ProtectionUiState) {
         textAlign = TextAlign.Center,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { expanded = !expanded }
+            .clickable {
+                SciFiSound.blip()
+                expanded = !expanded
+            }
             .padding(vertical = 4.dp),
     )
     AnimatedVisibility(
@@ -317,8 +333,8 @@ private fun enforcementLine(state: ProtectionUiState): String = when {
 @Composable
 private fun dotColor(state: ProtectionUiState): Color = when {
     state.enforcementMismatch -> colorScheme.error
-    state.isRecovering -> Color(0xFFF9A825)
-    state.enforcementStatus == EnforcementStatus.ACTIVE_RESTRICTED -> Color(0xFF2E7D32)
-    state.enforcementStatus == EnforcementStatus.RECONCILING -> Color(0xFFF9A825)
+    state.isRecovering -> SciFiColors.SolarAmber
+    state.enforcementStatus == EnforcementStatus.ACTIVE_RESTRICTED -> SciFiColors.GoGreen
+    state.enforcementStatus == EnforcementStatus.RECONCILING -> SciFiColors.SolarAmber
     else -> colorScheme.error
 }

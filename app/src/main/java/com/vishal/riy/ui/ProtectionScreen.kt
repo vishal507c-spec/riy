@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -86,6 +87,8 @@ fun ProtectionScreen(
         // The single UI action. It goes through the system VPN consent dialog
         // first; consent is never assumed and never implied.
         onEnableProtection = {
+            // Shield power-up sweep, then the normal consent/start path.
+            SciFiSound.engage()
             val consentIntent = VpnService.prepare(context)
             if (consentIntent != null) {
                 vpnConsentLauncher.launch(consentIntent)
@@ -110,20 +113,29 @@ internal fun ProtectionScreen(
 ) {
     val presentation = state.userFacing()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    SciFiFrame(
+        header = "R.I.Y. // PLANETARY SHIELD",
+        headerColor = SciFiColors.NeonCyan,
+        modifier = modifier,
     ) {
-        Spacer(Modifier.height(24.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+        Spacer(Modifier.height(28.dp))
 
-        // 1. One large status icon.
+        // Scanner sweep under the header — pure cockpit dressing.
+        ScanSweep(color = SciFiColors.NeonCyan)
+
+        // 1. One large status icon, glowing like a holo projector.
         Box(
             modifier = Modifier
                 .size(96.dp)
+                .shadow(28.dp, CircleShape, ambientColor = SciFiColors.NeonCyan)
                 .background(colorScheme.primaryContainer, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
@@ -179,6 +191,7 @@ internal fun ProtectionScreen(
             style = typography.bodySmall,
             color = colorScheme.onSurfaceVariant,
         )
+        }
     }
 }
 
@@ -252,9 +265,9 @@ private fun filterDetail(phase: BlockerState.Phase): String = when (phase) {
 
 @Composable
 private fun dotColor(phase: BlockerState.Phase): Color = when (phase) {
-    BlockerState.Phase.CONNECTED -> Color(0xFF2E7D32)
-    BlockerState.Phase.CONNECTING -> Color(0xFFF9A825)
+    BlockerState.Phase.CONNECTED -> SciFiColors.GoGreen
+    BlockerState.Phase.CONNECTING -> SciFiColors.SolarAmber
     BlockerState.Phase.FAILED -> colorScheme.error
-    BlockerState.Phase.OFF -> Color(0xFF9E9E9E)
+    BlockerState.Phase.OFF -> Color(0xFF5A6B7A)
 }
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.4.0 - 2026-10-01
+- Sci-fi cockpit UI: always-dark deep-space theme, neon-cyan holograms, plasma-magenta lockdown, targeting-corner brackets, radar scan-sweep animation, glowing status orb, terminal-monospace countdown
+- Synthesized soundboard (offline, bundled WAVs): UI blip, shield engage sweep, lockdown klaxon, release chime — all fire-and-forget, never break protection logic
+- Protection strings, icons, state mapping and lock behavior unchanged (zero-confusion contract intact)
+
 ## v2.3.1 - 2026-10-01
 - Fix scheduler wiring compile error in MainActivity (backup lambda passed as named `backupFn`)
 
