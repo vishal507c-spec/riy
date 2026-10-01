@@ -11,6 +11,9 @@
     <!-- Drive backup OAuth: enumerate a Google account + get an OAuth2 access token (no secret). -->
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
     <uses-permission android:name="android.permission.USE_CREDENTIALS" />
+    <!-- Connectivity callbacks for pending-sync replay (some OEMs throw
+         SecurityException from registerNetworkCallback without it). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Content blocker: persistent foreground VPN service + reboot restore. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

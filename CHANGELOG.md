@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.4.2 - 2026-10-01
+- Diagnose Drive login failures instead of swallowing them: sign-in cancel vs failure now logged distinctly; network observer gets the missing ACCESS_NETWORK_STATE permission (fixes register SecurityException on strict OEMs)
+
 ## v2.4.1 - 2026-10-01
 - Fix Drive login persistence: silent-first session restore (stored + platform + token validation), platform silent sign-in adoption, single-retry 401 token refresh, explicit sign-out — account picker now appears only when re-authentication is genuinely required
 

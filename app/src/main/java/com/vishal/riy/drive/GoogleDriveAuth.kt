@@ -28,9 +28,20 @@ object GoogleDriveAuth {
         .requestScopes(Scope(SCOPE_FILE))
         .build()
 
+    /**
+     * Extracts the signed-in account from the sign-in result intent. A null
+     * return means the sign-in did NOT succeed (user cancelled, developer
+     * error, failed scope grant, …) — the failure class is logged (never any
+     * token) so a dead sign-in loop is diagnosable instead of silent.
+     */
     fun accountFromIntent(data: Intent?): GoogleSignInAccount? = try {
         data?.let { GoogleSignIn.getSignedInAccountFromIntent(it).result }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        android.util.Log.w(
+            "RiyDrive",
+            "sign-in result carried no authenticated account: " +
+                "${e.javaClass.simpleName}: ${e.message}",
+        )
         null
     }
 

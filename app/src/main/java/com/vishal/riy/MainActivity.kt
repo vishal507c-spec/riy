@@ -174,9 +174,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleDriveSignInResult(data: android.content.Intent?) {
+        if (data == null) {
+            android.util.Log.w("RiyDrive", "sign-in returned with no result intent (cancelled)")
+            return // user cancelled; retry on next launch.
+        }
         val account = com.vishal.riy.drive.GoogleDriveAuth.accountFromIntent(data)
-            ?: return // user cancelled; retry on next launch.
-        val email = account.email ?: return
+            ?: return // failure already logged; retry on next launch.
+        val email = account.email
+        if (email.isNullOrBlank()) {
+            android.util.Log.w("RiyDrive", "sign-in succeeded but account has no email")
+            return
+        }
         driveScope.launch {
             // Ordered flow: auth → folder → restore → sync (same as reference).
             runCatching {
