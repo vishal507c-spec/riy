@@ -10,6 +10,8 @@ import androidx.lifecycle.lifecycleScope
 import com.vishal.riy.blocker.BlockerState
 import com.vishal.riy.blocker.BlockerStateStore
 import com.vishal.riy.blocker.BlockerVpnService
+import com.vishal.riy.drive.DriveSessionPolicy
+import com.vishal.riy.drive.GoogleDriveAuth
 import com.vishal.riy.ui.RiyApp
 import com.vishal.riy.update.ReleaseInfo
 import com.vishal.riy.update.UpdateChecker
@@ -94,7 +96,7 @@ class MainActivity : AppCompatActivity() {
         }
         try {
             googleSignInClient = com.google.android.gms.auth.api.signin.GoogleSignIn
-                .getClient(this, com.vishal.riy.drive.GoogleDriveAuth.signInOptions())
+                .getClient(this, GoogleDriveAuth.signInOptions())
             driveSignInLauncher = registerForActivityResult(
                 androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
             ) { r -> handleDriveSignInResult(r.data) }
@@ -120,57 +122,94 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Silent-first Drive bootstrap: the interactive account picker is the LAST
-     * resort, shown only when no existing session can be restored. Order:
+     * resort. Order:
      *  1. re-attach remembered wiring (no UI);
-     *  2. validate the persisted session silently (stored email + live
-     *     platform session for the same account + obtainable token) → enter;
-     *  3. adopt a platform silent sign-in (fresh install, grant still held) → enter;
-     *  4. ONLY then launch the account picker.
-     * Every step is best-effort; protection never depends on Drive.
+     *  2. ask [restoreDriveSessionSilently] for evidence, and let the
+     *     unit-tested [DriveSessionPolicy] decide enter-vs-picker;
+     *  3. when it says enter, restore and reconcile (no picker);
+     *  4. ONLY when it says a login is genuinely required (no session,
+     *     explicit logout, or a revoked/removed grant) launch the picker.
+     *
+     * Runs exactly once per process. Every step is best-effort; protection
+     * never depends on Drive.
      */
     private suspend fun runDriveBootstrap() {
         runCatching { driveManager.reconcileOnStartup() }
-        if (runCatching { restoreDriveSessionSilently() }.getOrDefault(false)) {
+        // One decision, made by the unit-tested state machine, so "do we show
+        // the picker?" can never disagree with the tested session matrix.
+        val action = runCatching { restoreDriveSessionSilently() }
+            .getOrDefault(DriveSessionPolicy.SessionAction.SHOW_PICKER)
+        if (action == DriveSessionPolicy.SessionAction.ENTER_SILENT) {
             runCatching { driveManager.autoRestoreIfNeeded() }
             runCatching { driveManager.reconcileAndCatchUp() }
             return
         }
-        if (runCatching { driveManager.driveNeedsAuthorization() }.getOrDefault(false)) {
-            // ActivityResultLauncher must launch on the main thread.
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                runCatching { driveSignInLauncher.launch(googleSignInClient.signInIntent) }
-            }
-            return // the sign-in result continues the bootstrap.
+        // A picker is genuinely required: no stored session, an explicit
+        // logout, or a grant that no longer exists (revoked / account removed).
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            runCatching { driveSignInLauncher.launch(googleSignInClient.signInIntent) }
         }
-        runCatching { driveManager.autoRestoreIfNeeded() }
-        runCatching { driveManager.reconcileAndCatchUp() }
     }
 
     /**
-     * Restores the Drive session WITHOUT any UI. Returns true when the app may
-     * enter directly: either the persisted session re-validates, or the
-     * platform grants a silent sign-in that is immediately adopted. A `false`
-     * means re-authentication is genuinely required (revoked/removed account,
-     * no grant, offline, …) and the caller must show the picker.
+     * Restores the Drive session WITHOUT any UI and reports what the caller
+     * must do next. Evidence gathered here, judged by [DriveSessionPolicy]:
+     *
+     *  1. remembered account + a genuinely obtainable OAuth token → ENTER_SILENT
+     *     (covers reopen, force-stop, app update and token expiry);
+     *  2. nothing remembered, but the platform can silently authenticate the
+     *     same grant and a token follows → adopt it → ENTER_SILENT;
+     *  3. anything else → SHOW_PICKER.
+     *
+     * The GoogleSignIn cache is passed as a hint only; the token decides.
      */
-    private suspend fun restoreDriveSessionSilently(): Boolean {
-        // 1. Returning user: persisted + live + provably valid session.
-        if (runCatching { driveManager.validateStoredSession() }.getOrDefault(false)) {
-            return true
-        }
-        // 2. Adoptable platform session (never invent one: silentSignIn either
-        //    yields a real authenticated account or throws).
-        return try {
-            val account = com.google.android.gms.tasks.Tasks.await(
-                googleSignInClient.silentSignIn(),
+    private suspend fun restoreDriveSessionSilently(): DriveSessionPolicy.SessionAction {
+        val loggedOut = runCatching { driveManager.isLoggedOut() }.getOrDefault(false)
+        val stored = runCatching { driveManager.storedAccount() }.getOrDefault(null)
+
+        // 1. Returning user: a real token for the remembered account.
+        if (stored != null) {
+            val valid = runCatching { driveManager.validateStoredSession() }.getOrDefault(false)
+            return DriveSessionPolicy.decide(
+                DriveSessionPolicy.SessionInputs(
+                    storedEmail = stored,
+                    platformEmail = GoogleDriveAuth.lastSignedIn(this)?.email,
+                    silentSignInOk = false,
+                    tokenOk = valid,
+                    userLoggedOut = loggedOut,
+                ),
             )
-            val email = account.email ?: return false
-            driveManager.connectDrive(email, account.displayName, account.photoUrl?.toString())
-            driveManager.finalizeProvisioning()
-            true
-        } catch (_: Exception) {
-            false
         }
+
+        // 2. Nothing remembered (fresh install / storage cleared / reinstall):
+        //    adopt a grant the platform can still authenticate silently.
+        //    NEVER after an explicit logout — adopting here would immediately
+        //    clear the logged-out marker and silently undo the logout.
+        var silentOk = false
+        if (!loggedOut) {
+            val adopted = runCatching {
+                val account = com.google.android.gms.tasks.Tasks.await(
+                    googleSignInClient.silentSignIn(),
+                )
+                val email = account.email
+                if (email.isNullOrBlank()) return@runCatching null
+                driveManager.connectDrive(email, account.displayName, account.photoUrl?.toString())
+                driveManager.finalizeProvisioning()
+                email
+            }.getOrNull()
+            if (adopted != null) {
+                silentOk = GoogleDriveAuth.usableToken(this, adopted) != null
+            }
+        }
+        return DriveSessionPolicy.decide(
+            DriveSessionPolicy.SessionInputs(
+                storedEmail = null,
+                platformEmail = null,
+                silentSignInOk = silentOk,
+                tokenOk = silentOk,
+                userLoggedOut = loggedOut,
+            ),
+        )
     }
 
     private fun handleDriveSignInResult(data: android.content.Intent?) {
@@ -178,7 +217,7 @@ class MainActivity : AppCompatActivity() {
             android.util.Log.w("RiyDrive", "sign-in returned with no result intent (cancelled)")
             return // user cancelled; retry on next launch.
         }
-        val account = com.vishal.riy.drive.GoogleDriveAuth.accountFromIntent(data)
+        val account = GoogleDriveAuth.accountFromIntent(data)
             ?: return // failure already logged; retry on next launch.
         val email = account.email
         if (email.isNullOrBlank()) {

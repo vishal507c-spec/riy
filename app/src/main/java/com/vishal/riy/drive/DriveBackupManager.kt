@@ -293,29 +293,49 @@ class DriveBackupManager(private val appContext: Context) {
     }
 
     /**
-     * Silent session validation for startup: the persisted session counts as
-     * valid ONLY when (a) an account email is stored, (b) the platform still
-     * holds a signed-in Google session for the SAME account, and (c) a fresh
-     * access token is actually obtainable right now. `GoogleAuthUtil`
-     * transparently refreshes an expired access token behind the scenes, so a
-     * refreshable expiry still validates silently. The email alone is never
-     * trusted as proof of authentication.
+     * Silent session validation for startup. A persisted session counts as valid
+     * ONLY when a real OAuth access token is obtainable RIGHT NOW for the stored
+     * account — that token is the proof of authentication. The stored email is
+     * only a pointer to which account to ask about; it is never accepted on its
+     * own.
      *
-     * On success the coordinator is re-attached when missing. Never throws.
+     * The GoogleSignIn cache is deliberately NOT consulted. It lives in a separate
+     * store from the OAuth grant and is routinely empty after a process kill, an
+     * app update, or Play Services cache eviction. Gating on it meant a returning
+     * user with a perfectly valid Drive grant was pushed back to the account picker
+     * on every launch.
+     *
+     * `GoogleAuthUtil.getToken` transparently refreshes an expired access token,
+     * so an ordinary expiry recovers here without any UI (requirement 7). The
+     * coordinator is re-attached when missing. Never throws.
      */
     suspend fun validateStoredSession(): Boolean = withContext(Dispatchers.IO) {
         return@withContext try {
             val email = prefs.getString(KEY_ACCOUNT, null)?.trim()?.takeIf { it.isNotEmpty() }
                 ?: return@withContext false
-            val platformEmail = GoogleDriveAuth.lastSignedIn(appContext)?.email
-            if (!email.equals(platformEmail?.trim(), ignoreCase = true)) return@withContext false
-            // Proof of a live session: a token must be obtainable NOW.
-            GoogleDriveAuth.accessToken(appContext, email)
+            // Proof of a live grant: a usable token must be obtainable NOW.
+            if (GoogleDriveAuth.usableToken(appContext, email) == null) return@withContext false
             if (coordinator == null) attachCoordinator(email)
+            Log.i(TAG, "session restored silently for $email")
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "silent session validation failed: ${e.javaClass.simpleName}")
             false
         }
+    }
+
+    /** The remembered Drive account, or null when nothing is authorized. */
+    suspend fun storedAccount(): String? = withContext(Dispatchers.IO) {
+        prefs.getString(KEY_ACCOUNT, null)?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    /**
+     * True once the user has explicitly logged out. Persisted (not just an
+     * in-memory flag) so it survives process death, force-stop and app update,
+     * and guarantees the next launch asks for the account again.
+     */
+    suspend fun isLoggedOut(): Boolean = withContext(Dispatchers.IO) {
+        prefs.getBoolean(KEY_LOGGED_OUT, false)
     }
 
     /**
@@ -338,6 +358,9 @@ class DriveBackupManager(private val appContext: Context) {
                 .remove(KEY_FOLDER).remove(KEY_FOLDER_ACCOUNT).remove(KEY_PROVISIONED)
                 .remove(KEY_SYNC_SHA).remove(KEY_SYNC_GEN)
                 .remove(KEY_SYNC_AT).remove(KEY_SYNC_ATTEMPTS)
+                // Persisted so the next launch is REQUIRED to show the picker,
+                // even if the platform still holds the grant.
+                .putBoolean(KEY_LOGGED_OUT, true)
                 .apply()
             coordinator = null
             true
@@ -360,6 +383,8 @@ class DriveBackupManager(private val appContext: Context) {
             }
             if (!displayName.isNullOrBlank()) prefs.edit().putString(KEY_NAME, displayName).apply()
             if (!photoUrl.isNullOrBlank()) prefs.edit().putString(KEY_PHOTO, photoUrl).apply()
+            // A completed interactive sign-in ends any logged-out state.
+            prefs.edit().putBoolean(KEY_LOGGED_OUT, false).apply()
             attachCoordinator(clean)
             Log.i(TAG, "Drive connected: $clean")
         }
@@ -471,5 +496,7 @@ class DriveBackupManager(private val appContext: Context) {
         const val KEY_SYNC_GEN = "sync_pending_gen"
         const val KEY_SYNC_AT = "sync_pending_at"
         const val KEY_SYNC_ATTEMPTS = "sync_pending_attempts"
+        /** Set by an explicit logout; cleared by a completed sign-in. */
+        const val KEY_LOGGED_OUT = "drive_logged_out"
     }
 }

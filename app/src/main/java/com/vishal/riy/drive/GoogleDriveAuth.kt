@@ -74,10 +74,15 @@ object GoogleDriveAuth {
             }
 
     /**
-     * The platform's currently signed-in account for THESE sign-in options, or
-     * null when nobody is signed in. Synchronous, no UI, never throws. This is
-     * the first silent-session check: a returning user is recognised here
-     * WITHOUT any account picker.
+     * The platform's GoogleSignIn CACHE entry for these sign-in options, or
+     * null when the cache is cold. Synchronous, no UI, never throws.
+     *
+     * This is a HINT ONLY, never proof of authentication: the cache lives in a
+     * different store from the OAuth grant that [usableToken] reads, and it is
+     * routinely empty after a process kill, an app update or Play Services
+     * cache eviction even though the grant is still perfectly valid. Gating
+     * session restore on this used to send a returning user back to the account
+     * picker. Use [usableToken] to decide.
      */
     fun lastSignedIn(context: Context): GoogleSignInAccount? = try {
         GoogleSignIn.getLastSignedInAccount(context.applicationContext)
@@ -99,4 +104,32 @@ object GoogleDriveAuth {
 
     fun accessToken(context: Context, email: String): String =
         GoogleAuthUtil.getToken(context.applicationContext, toAndroidAccount(email), "oauth2:$SCOPE_FILE")
+
+    /**
+     * Returns a usable access token for [email], or null when no live OAuth
+     * grant exists. This is the ONLY proof of authentication the session layer
+     * accepts — never the stored email on its own.
+     *
+     * `getToken` already refreshes an expired access token behind the scenes,
+     * so an expiry is invisible here (that is requirement 7: recover silently).
+     * One extra attempt is made because a single transient failure (Play
+     * Services still warming up right after a process start) must not be
+     * mistaken for a revoked grant and escalate to the account picker.
+     *
+     * Never throws, so callers cannot accidentally treat an exception as a
+     * valid session.
+     */
+    fun usableToken(context: Context, email: String): String? {
+        val clean = email.trim()
+        if (clean.isEmpty()) return null
+        repeat(2) {
+            val token = try {
+                accessToken(context, clean)
+            } catch (_: Exception) {
+                null
+            }
+            if (!token.isNullOrBlank()) return token
+        }
+        return null
+    }
 }
