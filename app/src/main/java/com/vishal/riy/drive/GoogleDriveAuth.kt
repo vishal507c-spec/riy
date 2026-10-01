@@ -26,22 +26,16 @@ object GoogleDriveAuth {
     const val SCOPE_FILE = "https://www.googleapis.com/auth/drive.file"
 
     /**
-     * Requests ONLY what this app consumes: the account email (the Drive owner
-     * identity) and the least-privilege Drive scope.
+     * Sign-in options for Drive backup.
      *
-     * Deliberately NOT seeded from [GoogleSignInOptions.DEFAULT_SIGN_IN]. That
-     * constant is a full options object whose builder additionally called
-     * `requestId()`, i.e. it asks for the `openid` scope and an ID TOKEN. An ID
-     * token is minted for a Web-application OAuth client; this app registers an
-     * ANDROID-type OAuth client only and never reads
-     * [GoogleSignInAccount.idToken] (the access token comes from [accessToken]
-     * via GoogleAuthUtil). Asking an Android client for an ID token is a
-     * client-type mismatch that the auth backend rejects with
-     * `CommonStatusCodes.DEVELOPER_ERROR` (10) right after the account is
-     * picked — which is exactly the observed failure. Building the options
-     * directly keeps the requested scope set to email + drive.file.
+     * Byte-for-byte the same construction as the working reference
+     * (`com.vishal.unit` GoogleDriveAuth.signInOptions): seed from
+     * [GoogleSignInOptions.DEFAULT_SIGN_IN], then request the account email and
+     * the least-privilege Drive scope. Deliberately kept identical to that
+     * proven-good pattern — do NOT "optimise" this by dropping
+     * DEFAULT_SIGN_IN, it changes the request GMS sends to the OAuth backend.
      */
-    fun signInOptions(): GoogleSignInOptions = GoogleSignInOptions.Builder()
+    fun signInOptions(): GoogleSignInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
         .requestEmail()
         .requestScopes(Scope(SCOPE_FILE))
         .build()
