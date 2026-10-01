@@ -7,6 +7,8 @@ import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Scope
 
 /**
@@ -23,7 +25,23 @@ object GoogleDriveAuth {
     /** Drive scoped to app-created files (recommended, least privilege). */
     const val SCOPE_FILE = "https://www.googleapis.com/auth/drive.file"
 
-    fun signInOptions(): GoogleSignInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+    /**
+     * Requests ONLY what this app consumes: the account email (the Drive owner
+     * identity) and the least-privilege Drive scope.
+     *
+     * Deliberately NOT seeded from [GoogleSignInOptions.DEFAULT_SIGN_IN]. That
+     * constant is a full options object whose builder additionally called
+     * `requestId()`, i.e. it asks for the `openid` scope and an ID TOKEN. An ID
+     * token is minted for a Web-application OAuth client; this app registers an
+     * ANDROID-type OAuth client only and never reads
+     * [GoogleSignInAccount.idToken] (the access token comes from [accessToken]
+     * via GoogleAuthUtil). Asking an Android client for an ID token is a
+     * client-type mismatch that the auth backend rejects with
+     * `CommonStatusCodes.DEVELOPER_ERROR` (10) right after the account is
+     * picked — which is exactly the observed failure. Building the options
+     * directly keeps the requested scope set to email + drive.file.
+     */
+    fun signInOptions(): GoogleSignInOptions = GoogleSignInOptions.Builder()
         .requestEmail()
         .requestScopes(Scope(SCOPE_FILE))
         .build()
@@ -39,11 +57,27 @@ object GoogleDriveAuth {
     } catch (e: Exception) {
         android.util.Log.w(
             "RiyDrive",
-            "sign-in result carried no authenticated account: " +
-                "${e.javaClass.simpleName}: ${e.message}",
+            "sign-in result carried no authenticated account: " + describeFailure(e),
         )
         null
     }
+
+    /**
+     * Full failure detail for a dead sign-in. Every cause in the chain is named
+     * and its GMS status code is resolved to a readable status (e.g.
+     * `10 (DEVELOPER_ERROR)`), because `ApiException.message` on its own only
+     * renders as `"10:"` and hides the reason. Never logs a token or any
+     * account credential — only class names, numeric status codes and the
+     * exception's own message.
+     */
+    private fun describeFailure(error: Throwable): String =
+        generateSequence(error) { it.cause }
+            .take(6)
+            .joinToString("  <-  ") { cause ->
+                val status = (cause as? ApiException)?.statusCode
+                val label = status?.let { "$it (${CommonStatusCodes.getStatus(it)})" } ?: "n/a"
+                "${cause.javaClass.name}[status=$label]: ${cause.message}"
+            }
 
     /**
      * The platform's currently signed-in account for THESE sign-in options, or
