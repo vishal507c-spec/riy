@@ -75,7 +75,7 @@ object GoogleDriveAuth {
             .take(6)
             .joinToString("  <-  ") { cause ->
                 val status = (cause as? ApiException)?.statusCode
-                val label = status?.let { "$it (${CommonStatusCodes.getStatus(it)})" } ?: "n/a"
+                val label = status?.let { "$it (${CommonStatusCodes.getStatusCodeString(it)})" } ?: "n/a"
                 "${cause.javaClass.name}[status=$label]: ${cause.message}"
             }
 
