@@ -36,6 +36,8 @@ class PrefsProtectionEventStore(
             records
         }
         prefs.edit().putString(KEY_EVENTS, capped.joinToString(RECORD_SEP)).apply()
+        // Event log changed → coalesced Drive snapshot (never throws).
+        com.vishal.riy.drive.DriveSync.requestBackup()
     }
 
     override fun recent(limit: Int): List<ProtectionLogEvent> {
@@ -47,6 +49,8 @@ class PrefsProtectionEventStore(
 
     override fun clear() {
         prefs.edit().remove(KEY_EVENTS).apply()
+        // Event log changed → coalesced Drive snapshot (never throws).
+        com.vishal.riy.drive.DriveSync.requestBackup()
     }
 
     private fun loadRecords(): List<String> {

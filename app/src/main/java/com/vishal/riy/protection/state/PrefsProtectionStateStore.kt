@@ -26,10 +26,14 @@ class PrefsProtectionStateStore(context: Context) : ProtectionStateStore {
         prefs.edit()
             .putString(KEY_SESSION, ProtectionSessionSerialization.encode(session))
             .apply()
+        // Protection state changed → coalesced Drive snapshot (never throws).
+        com.vishal.riy.drive.DriveSync.requestBackup()
     }
 
     override fun clear() {
         prefs.edit().remove(KEY_SESSION).apply()
+        // Protection state changed → coalesced Drive snapshot (never throws).
+        com.vishal.riy.drive.DriveSync.requestBackup()
     }
 
     /** Same semantics as the contract: the persisted view of [load]. */

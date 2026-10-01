@@ -28,6 +28,8 @@ class PrefsLockStore(context: Context) : LockStore {
 
     override fun saveState(state: LockState) {
         prefs.edit().putString(KEY_STATE, LockStateSerialization.encode(state)).apply()
+        // Protection state changed → coalesced Drive snapshot (never throws).
+        com.vishal.riy.drive.DriveSync.requestBackup()
     }
 
     private companion object {

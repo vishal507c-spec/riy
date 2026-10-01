@@ -20,6 +20,8 @@ class BlockerStateStore(context: Context) {
 
     fun setProtectionWanted(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_PROTECTION_WANTED, enabled).apply()
+        // Protection intent changed → coalesced Drive snapshot (never throws).
+        com.vishal.riy.drive.DriveSync.requestBackup()
     }
 
     companion object {

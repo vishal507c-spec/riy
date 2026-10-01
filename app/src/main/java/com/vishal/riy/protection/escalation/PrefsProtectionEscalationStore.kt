@@ -32,10 +32,14 @@ class PrefsProtectionEscalationStore(context: Context) : ProtectionEscalationSto
         prefs.edit()
             .putString(KEY_STATE, EscalationStateSerialization.encode(state))
             .commit()
+        // Escalation state changed → coalesced Drive snapshot (never throws).
+        com.vishal.riy.drive.DriveSync.requestBackup()
     }
 
     override fun clear() {
         prefs.edit().remove(KEY_STATE).commit()
+        // Escalation state changed → coalesced Drive snapshot (never throws).
+        com.vishal.riy.drive.DriveSync.requestBackup()
     }
 
     private companion object {

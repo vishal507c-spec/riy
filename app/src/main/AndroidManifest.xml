@@ -8,6 +8,10 @@
          Android still enforces signature checks at install time. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Drive backup OAuth: enumerate a Google account + get an OAuth2 access token (no secret). -->
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <uses-permission android:name="android.permission.USE_CREDENTIALS" />
+
     <!-- Content blocker: persistent foreground VPN service + reboot restore. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />

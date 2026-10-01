@@ -58,11 +58,15 @@ class PrefsObservationStore(
 
         current += observation
         persist(current.takeLast(ProtectionCorrelationWindow.MAX_RETAINED))
+        // Observation recorded → coalesced Drive snapshot (never throws).
+        com.vishal.riy.drive.DriveSync.requestBackup()
         return true
     }
 
     override fun clear() {
         prefs.edit().remove(KEY_OBSERVATIONS).apply()
+        // Observations changed → coalesced Drive snapshot (never throws).
+        com.vishal.riy.drive.DriveSync.requestBackup()
     }
 
     private fun persist(observations: List<SignalObservation>) {

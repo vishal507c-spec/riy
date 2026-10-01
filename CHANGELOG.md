@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.3.0 - 2026-10-01
+- Google Drive backup for protection state (cloned from the reference app's data platform): all six SharedPreferences stores (lock deadline, session, events, escalation, observations, VPN intent) snapshot into one canonical SHA-256-bound JSON VAULT in a dedicated `RiyBackup` Drive folder, plus `_latest_verified.json` pointer
+- Secretless OAuth (Google Sign-In + `drive.file` scope, no hardcoded secrets); search-before-create folder resolver per account; candidate → verify → promote → confirm publication with anti-rollback and same-generation conflict preservation
+- Debounced single-flight auto-backup after every store write; startup auto-restore only on fresh installs (valid local data never overwritten); persistent pending-sync queue replayed on foreground and connectivity return; offline-safe throughout
+- 27 new JVM unit tests (snapshot codec, coordinator, folder resolver, scheduler) alongside the existing suite
+
 ## v2.2.1 - 2026-10-01
 - Restored the GitHub auto-update system removed in v2.0.0 (exact v1.2.1 implementation): startup update check against `GET /repos/{owner}/{repo}/releases/latest`, numeric version comparison, draft/prerelease rejection, pinned-repo APK asset validation, authenticated private-repo download with trusted-CDN redirect allowlist, APK verification (package name + no downgrade) and handoff to the system installer via FileProvider
 - Throttled to one lightweight check per interval; every failure mode no-ops gracefully and never breaks the app

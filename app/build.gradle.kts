@@ -79,6 +79,10 @@ android {
         versionCode = computedVersionCode.toInt()
         versionName = computedVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Drive backup destination is PRECONFIGURED in the build (no secrets here;
+        // the Google account is authorized at runtime, never hardcoded).
+        buildConfigField("boolean", "REMOTE_BACKUP_ENABLED", "true")
+        buildConfigField("String", "DRIVE_FOLDER", "\"RiyBackup\"")
     }
 
     signingConfigs {
@@ -142,6 +146,11 @@ android {
 }
 
 dependencies {
+    // Google Drive backup: secretless Android OAuth (package + SHA-1, no client
+    // secret) via Google Sign-In + GoogleAuthUtil access token. Drive REST is
+    // called directly (no googleapis SDK).
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
@@ -165,6 +174,8 @@ dependencies {
     // org.json ships with Android; this copy is only for local JVM unit tests
     // (update ReleaseInfo parsing tests).
     testImplementation("org.json:json:20240303")
+    // Deterministic scheduler tests (virtual-time debounce).
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 
     // On-device instrumented tests (real Compose UI on a device/emulator):
     // these verify that the lock screen appears and cannot be backed out of.

@@ -16,6 +16,9 @@ import com.vishal.riy.update.UpdateChecker
 import com.vishal.riy.update.UpdateDialogFragment
 import com.vishal.riy.update.UpdatePreferences
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /** TEMPORARY diagnostic tag; never contains credentials. */
@@ -38,6 +41,13 @@ class MainActivity : AppCompatActivity() {
     private var updateDialogShown = false
     private var resumeObserver: LifecycleEventObserver? = null
 
+    // Drive backup: process-wide debounced scheduler + network-triggered flush.
+    private val driveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val driveManager by lazy { com.vishal.riy.drive.DriveBackupManager(applicationContext) }
+    private lateinit var googleSignInClient: com.google.android.gms.auth.api.signin.GoogleSignInClient
+    private lateinit var driveSignInLauncher: androidx.activity.result.ActivityResultLauncher<android.content.Intent>
+    private var networkObserver: com.vishal.riy.drive.BackupNetworkObserver? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent { RiyApp() }
@@ -45,11 +55,93 @@ class MainActivity : AppCompatActivity() {
         scheduleUpdateCheck()
         restoreProtectionIfInterrupted()
         protectUninstallIfOwner()
+        installDriveBackup()
     }
 
     override fun onStart() {
         super.onStart()
         restoreProtectionIfInterrupted()
+        // Re-register network callbacks (released in onStop) and replay any
+        // pending Drive sync on EVERY foreground (never blocks UI).
+        ensureNetworkObserver()
+        driveScope.launch { runCatching { driveManager.flushPendingSync() } }
+    }
+
+    override fun onStop() {
+        networkObserver?.unregister()
+        networkObserver = null
+        super.onStop()
+    }
+
+    /**
+     * Drive backup bootstrap (cloned from the reference ordering):
+     * scheduler install → network observer → reconcile → authorize (OAuth
+     * consent only when needed) → restore-if-empty → catch-up sync.
+     * Every step is best-effort; protection never depends on Drive.
+     */
+    private fun installDriveBackup() {
+        try {
+            com.vishal.riy.drive.DriveSync.install(
+                com.vishal.riy.drive.DriveBackupScheduler(driveScope) {
+                    driveManager.backupAfterTransaction()
+                },
+            )
+        } catch (_: Exception) {
+            // Drive must never break startup.
+        }
+        try {
+            googleSignInClient = com.google.android.gms.auth.api.signin.GoogleSignIn
+                .getClient(this, com.vishal.riy.drive.GoogleDriveAuth.signInOptions())
+            driveSignInLauncher = registerForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+            ) { r -> handleDriveSignInResult(r.data) }
+        } catch (_: Exception) {
+            // Sign-in unavailable; Drive stays disconnected.
+        }
+        ensureNetworkObserver()
+        driveScope.launch { runDriveBootstrap() }
+    }
+
+    /** (Re-)registers connectivity-triggered pending-sync flush. Never throws. */
+    private fun ensureNetworkObserver() {
+        if (networkObserver != null) return
+        try {
+            networkObserver = com.vishal.riy.drive.BackupNetworkObserver(
+                applicationContext, driveScope, driveManager,
+            ).also { it.register() }
+        } catch (_: Exception) {
+            // Network callbacks unavailable; pending sync still flushes on foreground.
+            networkObserver = null
+        }
+    }
+
+    private suspend fun runDriveBootstrap() {
+        runCatching { driveManager.reconcileOnStartup() }
+        if (runCatching { driveManager.driveNeedsAuthorization() }.getOrDefault(false)) {
+            // ActivityResultLauncher must launch on the main thread.
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                runCatching { driveSignInLauncher.launch(googleSignInClient.signInIntent) }
+            }
+            return // the sign-in result continues the bootstrap.
+        }
+        runCatching { driveManager.autoRestoreIfNeeded() }
+        runCatching { driveManager.reconcileAndCatchUp() }
+    }
+
+    private fun handleDriveSignInResult(data: android.content.Intent?) {
+        val account = com.vishal.riy.drive.GoogleDriveAuth.accountFromIntent(data)
+            ?: return // user cancelled; retry on next launch.
+        val email = account.email ?: return
+        driveScope.launch {
+            // Ordered flow: auth → folder → restore → sync (same as reference).
+            runCatching {
+                driveManager.connectDrive(email, account.displayName, account.photoUrl?.toString())
+            }
+            runCatching { driveManager.finalizeProvisioning() }
+            runCatching { driveManager.autoRestoreIfNeeded() }
+            runCatching { driveManager.reconcileAndCatchUp() }
+            runCatching { driveManager.finalizeProvisioning() }
+        }
     }
 
     /**
