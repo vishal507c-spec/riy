@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.6.2 - 2026-10-02
+- Device Owner grant/revocation now triggers immediate reconciliation: the admin receiver funnels into the single reconciliation entry point, so a live restriction is re-applied (or honestly reported unverifiable) the moment privileges change
+
 ## v2.6.1 - 2026-10-02
 - Fix release build: correct `Stroke` import for the lock-screen countdown ring (`androidx.compose.ui.graphics.drawscope`)
 
