@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.6.1 - 2026-10-02
+- Fix release build: correct `Stroke` import for the lock-screen countdown ring (`androidx.compose.ui.graphics.drawscope`)
+
 ## v2.6.0 - 2026-10-02
 - Advanced shield console UI: breathing status orb (pulses while the filter runs), six tappable guard layers with live Active/Ready/Unavailable statuses plus second-depth detail lines, four-step How-It-Works pipeline, countdown progress ring on the lock screen (same single deadline, no second timer)
 - Zero-confusion contract intact: plain human language only, no package names/domains/logs/counts, no Disable/Pause control, lock screen still non-dismissible

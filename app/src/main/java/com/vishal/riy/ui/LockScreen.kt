@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -188,7 +189,7 @@ private fun CountdownRing(
                 startAngle = 0f,
                 sweepAngle = 360f,
                 useCenter = false,
-                style = androidx.compose.ui.graphics.Stroke(width = 14f),
+                style = Stroke(width = 14f),
             )
             // Remaining: drains clockwise from the top as time passes.
             drawArc(
@@ -196,7 +197,7 @@ private fun CountdownRing(
                 startAngle = -90f,
                 sweepAngle = 360f * progress,
                 useCenter = false,
-                style = androidx.compose.ui.graphics.Stroke(width = 14f),
+                style = Stroke(width = 14f),
             )
         }
         Text(
