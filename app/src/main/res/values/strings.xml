@@ -73,6 +73,54 @@
     <string name="state_active">Active</string>
     <string name="state_applying">Applying…</string>
     <string name="state_unavailable">Unavailable</string>
+    <string name="state_ready">Ready</string>
+
+    <!-- Advanced feature showcase: what the app guards, in plain language -->
+    <string name="features_section">Shield Layers</string>
+    <string name="features_section_detail">Everything RIY guards, and how each guard is doing right now.</string>
+
+    <string name="layer_network_title">Network Filter</string>
+    <string name="layer_network_desc">Harmful sites are blocked in every app and browser, before they can load.</string>
+
+    <string name="layer_lock_title">2-Hour Limit</string>
+    <string name="layer_lock_desc">A harmful request starts a 2-hour device limit, automatically.</string>
+
+    <string name="layer_telegram_title">Telegram Stays Open</string>
+    <string name="layer_telegram_desc">Chats, groups and calls keep working. Telegram is never blocked.</string>
+
+    <string name="layer_bypass_title">Bypass Apps Blocked</string>
+    <string name="layer_bypass_desc">File-sharing and bypass apps cannot open while protection is active.</string>
+
+    <string name="layer_install_title">Install Guard</string>
+    <string name="layer_install_desc">Unknown app installs are stopped while protection is active.</string>
+
+    <string name="layer_recovery_title">Reboot Recovery</string>
+    <string name="layer_recovery_desc">Protection restores itself after a restart or a reboot.</string>
+
+    <!-- Second-depth lines, revealed by tapping a layer -->
+    <string name="layer_network_more">Runs as a lightweight filter on this device. Your messages and chats are never read.</string>
+    <string name="layer_lock_more">Only a confirmed harmful request can start it. The timer cannot be skipped or cleared early.</string>
+    <string name="layer_telegram_more">Telegram is on the allowed list by policy, so it stays open even during a limit.</string>
+    <string name="layer_bypass_more">These apps are hidden and paused automatically the moment protection starts.</string>
+    <string name="layer_install_more">Needs the full device setup. Your normal app updates are never touched.</string>
+    <string name="layer_recovery_more">Every restart re-checks the limit and the guards, then restores them.</string>
+    <string name="layer_tap_hint">Tap a layer for more</string>
+
+    <!-- How-it-works pipeline, in plain language -->
+    <string name="how_section">How It Works</string>
+    <string name="how_section_detail">From a harmful request to recovery, in four steps.</string>
+
+    <string name="how_step1_title">Spot</string>
+    <string name="how_step1_desc">The filter spots a harmful request on the network.</string>
+
+    <string name="how_step2_title">Verify</string>
+    <string name="how_step2_desc">Checks confirm it twice, so a mistake can never start a limit.</string>
+
+    <string name="how_step3_title">Limit</string>
+    <string name="how_step3_desc">The device is limited for 2 hours. Calls and Telegram stay on.</string>
+
+    <string name="how_step4_title">Recover</string>
+    <string name="how_step4_desc">The limit ends by itself, and survives restarts.</string>
 
     <!-- Honest status line, never a reassuring default -->
     <string name="enforcement_verified">Enforcement verified</string>

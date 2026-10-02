@@ -23,7 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.Text
@@ -31,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -51,9 +49,10 @@ import com.vishal.riy.protection.ui.ProtectionUiState
  * state, never computes a deadline, and offers exactly one action: enabling the
  * filtering VPN after the system consent dialog.
  *
- * ZERO CONFUSION. The screen is deliberately minimal: one large status icon, one
- * large title, one short explanation, one primary status card, and an optional
- * details section. No risk score, no technical state, no event counts, no
+ * ZERO CONFUSION. The screen shows one large status icon, one large title, one
+ * short explanation, one primary status card, an optional details section,
+ * and the feature showcase (live guard layers + the four-step pipeline).
+ * No risk score, no technical state, no event counts, no
  * package names, no logs and no engine names are ever shown. The internal state
  * vocabulary of the protection backend appears nowhere in the UI.
  *
@@ -131,21 +130,13 @@ internal fun ProtectionScreen(
         // Scanner sweep under the header — pure cockpit dressing.
         ScanSweep(color = SciFiColors.NeonCyan)
 
-        // 1. One large status icon, glowing like a holo projector.
-        Box(
-            modifier = Modifier
-                .size(96.dp)
-                .shadow(28.dp, CircleShape, ambientColor = SciFiColors.NeonCyan)
-                .background(colorScheme.primaryContainer, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = presentation.icon,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = colorScheme.onPrimaryContainer,
-            )
-        }
+        // 1. The shield orb: a large glowing status icon that breathes while
+        //    the filter genuinely runs, and sits still otherwise.
+        ShieldOrb(
+            icon = presentation.icon,
+            glow = SciFiColors.NeonCyan,
+            breathing = blockerPhase == BlockerState.Phase.CONNECTED,
+        )
 
         // 2. One large title.
         Text(
@@ -170,6 +161,12 @@ internal fun ProtectionScreen(
 
         // 5. Optional Protection Details, in normal language.
         ProtectionDetailsCard(state)
+
+        // 6. What the app guards (live layer statuses) and how it works
+        //    (static four-step pipeline). Both render only — no controls,
+        //    no state decisions, and the backend vocabulary appears nowhere.
+        ShieldLayersSection(state)
+        HowItWorksSection()
 
         // The single action the UI may offer, and only when nothing is
         // restricting the device. While a restriction or a restoration is live

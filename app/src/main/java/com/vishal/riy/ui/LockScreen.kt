@@ -109,14 +109,17 @@ fun LockScreen(
                 textAlign = TextAlign.Center,
             )
 
-            // 3. The single countdown, only while a deadline is actually live.
+            // 3. The single countdown, only while a deadline is actually live —
+            //    ringed by its own progress arc. The ring is a pure visualisation
+            //    of the ONE authoritative deadline (remaining / total window):
+            //    no second timer is computed, started or shown anywhere.
             if (presentation.showsCountdown) {
                 Spacer(Modifier.height(20.dp))
-                Text(
-                    text = LockEngine.formatRemainingBrief(state.remainingTime),
-                    style = typography.displayLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = colorScheme.primary,
+                CountdownRing(
+                    remainingMs = state.remainingTime,
+                    startedAtMs = state.startedAt,
+                    expiresAtMs = state.expiresAt,
+                    ringColor = alertColor,
                 )
                 Text(
                     text = stringResource(R.string.time_remaining_label),
@@ -152,6 +155,57 @@ fun LockScreen(
             )
         }
         }
+    }
+}
+
+/**
+ * The countdown with its progress ring: the big remaining time centred inside
+ * a 360° arc that drains as the ONE deadline runs down. Pure rendering of
+ * [remainingMs] over the [startedAtMs]→[expiresAtMs] window the backend owns.
+ */
+@Composable
+private fun CountdownRing(
+    remainingMs: Long,
+    startedAtMs: Long,
+    expiresAtMs: Long,
+    ringColor: Color,
+) {
+    val windowMs = (expiresAtMs - startedAtMs).coerceAtLeast(0L)
+    val progress = if (windowMs > 0L) {
+        (remainingMs.coerceIn(0L, windowMs).toFloat() / windowMs).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
+    Box(
+        modifier = Modifier.size(228.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.foundation.Canvas(modifier = Modifier.size(228.dp)) {
+            // Track: full faint circle.
+            drawArc(
+                color = ringColor.copy(alpha = 0.22f),
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                style = androidx.compose.ui.graphics.Stroke(width = 14f),
+            )
+            // Remaining: drains clockwise from the top as time passes.
+            drawArc(
+                color = ringColor,
+                startAngle = -90f,
+                sweepAngle = 360f * progress,
+                useCenter = false,
+                style = androidx.compose.ui.graphics.Stroke(width = 14f),
+            )
+        }
+        Text(
+            text = LockEngine.formatRemainingBrief(remainingMs),
+            style = typography.displayLarge,
+            fontWeight = FontWeight.Bold,
+            color = colorScheme.primary,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

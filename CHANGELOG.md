@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.6.0 - 2026-10-02
+- Advanced shield console UI: breathing status orb (pulses while the filter runs), six tappable guard layers with live Active/Ready/Unavailable statuses plus second-depth detail lines, four-step How-It-Works pipeline, countdown progress ring on the lock screen (same single deadline, no second timer)
+- Zero-confusion contract intact: plain human language only, no package names/domains/logs/counts, no Disable/Pause control, lock screen still non-dismissible
+
 ## v2.5.0 - 2026-10-02
 - Telegram stays usable during protection: new COMMUNICATION allowlist category (verified installed + enabled + launcher-backed Telegram identities, never denylisted, message/media content never inspected)
 - TeraBox / file-sharing bypass closed via layered Device Owner enforcement: maintainable blocked-app policy (package + label metadata, not one hardcoded name), hide + suspend of bypass packages, suspension of unauthorized sideloads, unknown-source / Private-DNS / VPN-config user restrictions, install-time + boot + foreground reconciliation through one entry point, bypass-transport DNS sinkholing (TeraBox CDN + encrypted-DNS endpoints, no porn-lock arming)
