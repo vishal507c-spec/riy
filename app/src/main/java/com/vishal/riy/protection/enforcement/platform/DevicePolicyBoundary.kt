@@ -64,4 +64,59 @@ interface DevicePolicyBoundary {
      * is owned exclusively by `com.vishal.riy.admin.UninstallProtection`.
      */
     fun isUninstallBlocked(admin: AdminComponent, packageName: String): Boolean
+
+    // ------------------------------------------------- hardening (Device Owner)
+    // Best-effort privileged controls used ONLY while a restriction (or
+    // protection-wanted hardening) is active. Every method returns whether the
+    // platform call itself succeeded; callers must still read back the
+    // authoritative state (lock-task allowlist) before claiming enforcement.
+    // All are safe no-ops on non-owners (return false, never throw).
+
+    /**
+     * Hides ([hidden]=true) or unhides ([hidden]=false) [packageName].
+     * Hidden apps disappear from the launcher and cannot be launched.
+     * Implements `DevicePolicyManager.setApplicationHidden`.
+     */
+    fun setApplicationHidden(admin: AdminComponent, packageName: String, hidden: Boolean): Boolean =
+        false
+
+    /** True only if [packageName] is currently hidden by policy. */
+    fun isApplicationHidden(admin: AdminComponent, packageName: String): Boolean = false
+
+    /**
+     * Suspends ([suspended]=true) or unsuspends [packageNames].
+     * Suspended apps cannot be launched (system shows a suspended UI).
+     * Implements `DevicePolicyManager.setPackagesSuspended`.
+     */
+    fun setPackagesSuspended(
+        admin: AdminComponent,
+        packageNames: List<String>,
+        suspended: Boolean,
+    ): Boolean = false
+
+    /** The subset of [packageNames] currently suspended, read live. */
+    fun getSuspendedPackages(admin: AdminComponent, packageNames: List<String>): List<String> =
+        emptyList()
+
+    /**
+     * Adds the user restriction [restriction] (a `UserManager` key such as
+     * `no_install_unknown_sources`, `no_config_private_dns`,
+     * `no_config_vpn`). Implements `DevicePolicyManager.addUserRestriction`.
+     */
+    fun addUserRestriction(admin: AdminComponent, restriction: String): Boolean = false
+
+    /** Removes a previously added user restriction. */
+    fun clearUserRestriction(admin: AdminComponent, restriction: String): Boolean = false
+
+    /** True only if [restriction] is currently in force for [admin]. */
+    fun hasUserRestriction(admin: AdminComponent, restriction: String): Boolean = false
+
+    companion object {
+        /** Official `UserManager` restriction keys, as plain strings (JVM-safe). */
+        const val RESTRICTION_INSTALL_UNKNOWN_SOURCES = "no_install_unknown_sources"
+        const val RESTRICTION_CONFIG_PRIVATE_DNS = "no_config_private_dns"
+        const val RESTRICTION_CONFIG_VPN = "no_config_vpn"
+        const val RESTRICTION_INSTALL_APPS = "no_install_apps"
+        const val RESTRICTION_UNINSTALL_APPS = "no_uninstall_apps"
+    }
 }

@@ -23,6 +23,9 @@ class FakePackageDiscoveryBoundary(
     /** The user's selected input method, as Settings.Secure would report it. */
     private val inputMethod: String? = null,
 
+    /** Packages modelled as sideloaded / unknown-source installs. */
+    private val unknownSources: Set<String> = emptySet(),
+
 ) : PackageDiscoveryBoundary {
 
     override fun isPackageInstalled(packageName: String): Boolean =
@@ -57,6 +60,16 @@ class FakePackageDiscoveryBoundary(
 
     override fun packageLabel(packageName: String): String? =
         apps.firstOrNull { it.packageName == packageName }?.label
+
+    override fun installedPackages(): List<DiscoveredPackage> =
+        apps.map { it.toDiscovered() }
+
+    override fun isUnknownSource(packageName: String): Boolean =
+        packageName in unknownSources
+
+    /** Adds a modelled app directly (used by hardening tests). */
+    fun withApp(app: FakeApp): FakePackageDiscoveryBoundary =
+        FakePackageDiscoveryBoundary(apps + app, systemDialer, inputMethod, unknownSources)
 
     private fun FakeApp.toDiscovered() = DiscoveredPackage(
         packageName = packageName,
@@ -159,6 +172,29 @@ class FakeDeviceBuilder(
             label = "Keyboard",
             isSystem = true,
             hasLauncher = false,
+        )
+    }
+
+    /** A Telegram app (allowed communication). Enabled + launcher-backed. */
+    fun telegram(packageName: String = "org.telegram.messenger") {
+        apps += FakeApp(
+            packageName = packageName,
+            label = "Telegram",
+            isSystem = false,
+            intentActions = setOf(ACTION_VIEW),
+        )
+    }
+
+    /** A TeraBox-family app (blocked bypass). Enabled + launcher-backed. */
+    fun terabox(
+        packageName: String = "com.flextech.client.terabox",
+        label: String = "TeraBox",
+    ) {
+        apps += FakeApp(
+            packageName = packageName,
+            label = label,
+            isSystem = false,
+            intentActions = setOf(ACTION_VIEW),
         )
     }
 

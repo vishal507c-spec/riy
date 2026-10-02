@@ -115,16 +115,20 @@
         </receiver>
 
         <!-- Package-state watchdog: wakes only on real Android package
-             broadcasts aimed at RIY (no polling). Used to detect OEM
-             freezer/power-manager actuation and record it as an integrity
-             result. -->
+             broadcasts (no polling). Verifies RIY's own integrity AND funnels
+             every other package install / update / enable / removal into the
+             single reconciliation entry point, so a TeraBox or unauthorized
+             APK installed mid-restriction is immediately neutralized. RIY's
+             own same-package update is always exempt (verified, never blocked). -->
         <receiver
             android:name=".protection.integrity.PackageStateWatcher"
             android:exported="true">
             <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
                 <action android:name="android.intent.action.PACKAGE_CHANGED" />
                 <action android:name="android.intent.action.PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
                 <data android:scheme="package" />
             </intent-filter>
         </receiver>

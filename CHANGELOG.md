@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.5.0 - 2026-10-02
+- Telegram stays usable during protection: new COMMUNICATION allowlist category (verified installed + enabled + launcher-backed Telegram identities, never denylisted, message/media content never inspected)
+- TeraBox / file-sharing bypass closed via layered Device Owner enforcement: maintainable blocked-app policy (package + label metadata, not one hardcoded name), hide + suspend of bypass packages, suspension of unauthorized sideloads, unknown-source / Private-DNS / VPN-config user restrictions, install-time + boot + foreground reconciliation through one entry point, bypass-transport DNS sinkholing (TeraBox CDN + encrypted-DNS endpoints, no porn-lock arming)
+- RIY self-update flow always exempt (same-package updates verified, never blocked); existing tests untouched, 15 new JVM unit tests (policy, enforcement, DNS filter)
+
 ## v2.4.2 - 2026-10-01
 - Diagnose Drive login failures instead of swallowing them: sign-in cancel vs failure now logged distinctly; network observer gets the missing ACCESS_NETWORK_STATE permission (fixes register SecurityException on strict OEMs)
 

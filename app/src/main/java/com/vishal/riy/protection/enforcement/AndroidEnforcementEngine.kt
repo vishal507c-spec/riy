@@ -216,14 +216,21 @@ class AndroidEnforcementEngine(
             return lastApplicationResult
         }
 
-        // 6. Record the expectation and report.
+        // 6. Harden the device behind the same Device Owner seat: hide/suspend
+        //    bypass packages + unauthorized sideloads, and raise user
+        //    restrictions (unknown-source installs, Private DNS, VPN config).
+        //    Best-effort and fully reversible; a hardening failure never masks
+        //    the verified lock-task allowlist above (it is recorded, not fatal).
+        applyHardening(allowed, packages)
+
+        // 7. Record the expectation and report.
         // Store the CONFORMING policy so reconciliation matches the platform state
         // exactly without an unnecessary correction write.
         expected.set(ExpectedState(session, lockTaskPolicy, conformingPolicy))
         lastApplicationResult = PolicyApplicationResult.APPLIED
         lastReconciliation = ReconciliationResult.VERIFIED
 
-        // Surface the honest wallet/phone situation for the diagnostic report.
+        // Surface the honest wallet/phone/telegram situation for diagnostics.
         noteResolutionStatus(allowed)
 
         return lastApplicationResult
@@ -270,6 +277,11 @@ class AndroidEnforcementEngine(
             return lastApplicationResult
         }
 
+        // Release hardening: unhide/unsuspend everything we hardened and drop
+        // the protected-mode user restrictions. RIY's own uninstall protection
+        // is deliberately untouched (owned by UninstallProtection).
+        clearHardening()
+
         expected.set(null)
         lastApplicationResult = PolicyApplicationResult.APPLIED
         lastReconciliation = ReconciliationResult.VERIFIED
@@ -311,6 +323,23 @@ class AndroidEnforcementEngine(
             verified = actual.matches(expectedPolicy)
         }
 
+        // 3. Package-state reconciliation: a newly installed / unhidden /
+        //    unsuspended package must not silently widen the device. Re-apply
+        //    hardening against the CURRENT installed set whenever a restricted
+        //    session is expected; release it when no session is expected.
+        //    This is what makes "install TeraBox mid-restriction" a no-op
+        //    bypass: the install may land, but it is immediately neutralized.
+        if (expectation != null && expectation.session.state.isRestrictedSession()) {
+            val allowed = runCatching { appPolicyResolver.resolveAllowedApps() }.getOrElse { emptyList() }
+            val allowedSet = (allowed.map { it.packageName } + expectedPolicy.allowedPackages).toSet()
+            applyHardening(allowed, allowedSet.toList())
+        } else if (expectation == null) {
+            // No session expected: make sure no stale hardening orphans a
+            // hidden app after expiry (restore path already clears, this is
+            // the idempotent safety net for process-death races).
+            runCatching { clearHardening() }
+        }
+
         lastReconciliation = if (verified) ReconciliationResult.VERIFIED
         else if (actual.packages.isEmpty() && expectation == null) ReconciliationResult.ERROR
         else ReconciliationResult.MISMATCH
@@ -348,6 +377,7 @@ class AndroidEnforcementEngine(
             walletPackage = allowed.firstOrNull { it.category == AllowedAppCategory.WALLET }?.packageName,
             emergencyPackage = allowed.firstOrNull { it.category == AllowedAppCategory.EMERGENCY }?.packageName,
             inputMethodPackage = allowed.firstOrNull { it.category == AllowedAppCategory.SYSTEM_ESSENTIAL }?.packageName,
+            telegramPackage = allowed.firstOrNull { it.category == AllowedAppCategory.COMMUNICATION }?.packageName,
             applicationResult = lastApplicationResult,
             reconciliation = lastReconciliation,
             issues = issues.toList(),
@@ -535,13 +565,177 @@ class AndroidEnforcementEngine(
         return AllowlistSafety.Safe
     }
 
-    /** Records the honest phone/wallet resolution for the diagnostic report. */
+    /** Records the honest phone/wallet/telegram resolution for diagnostics. */
     private fun noteResolutionStatus(allowed: List<AllowedApp>) {
         if (allowed.none { it.category == AllowedAppCategory.WALLET }) {
             recordIssue("Wallet unresolved — restriction will operate without a wallet app")
         }
         if (allowed.none { it.category == AllowedAppCategory.PHONE }) {
             recordIssue("Phone unresolved — integrity issue")
+        }
+        if (allowed.none { it.category == AllowedAppCategory.COMMUNICATION }) {
+            recordIssue("Telegram unresolved — restriction will operate without Telegram")
+        }
+    }
+
+    // ------------------------------------------------------- hardening layer
+    // Second enforcement layer behind the same Device Owner seat. Lock-task
+    // allowlisting is the primary control; hiding/suspending + user
+    // restrictions close the routes lock-task alone cannot cover:
+    //  - production never enters lock-task mode outside the debug hook, so
+    //    hidden/suspended is what actually neutralizes TeraBox mid-restriction;
+    //  - DISALLOW_INSTALL_UNKNOWN_SOURCES blocks sideloaded APK installs;
+    //  - DISALLOW_CONFIG_PRIVATE_DNS / DISALLOW_CONFIG_VPN block the
+    //    Private-DNS and rogue-VPN bypasses where the platform permits it.
+    // RIY itself and every allowlisted package are ALWAYS exempt (self-update
+    // and essentials keep working). System packages are never hidden/suspended
+    // (device must stay bootable); they remain governed by the lock-task
+    // allowlist. All hardening is best-effort and fully reversible.
+
+    /**
+     * Applies hardening for the CURRENT restriction: hides explicitly blocked
+     * packages (TeraBox family), suspends unauthorized non-system packages,
+     * and raises protected-mode user restrictions. Never throws.
+     */
+    private fun applyHardening(allowed: List<AllowedApp>, allowedPackages: List<String>) {
+        if (!isDeviceOwner()) return
+        val admin = adminComponent()
+        val allowedSet = allowedPackages.toSet()
+        runCatching {
+            val installed = runCatching { discovery.installedPackages() }.getOrElse { emptyList() }
+            val explicitBlocked = installed.filter {
+                it.packageName != riyPackageName &&
+                    BlockedAppPolicy.isBlockedPackage(it.packageName, it.label)
+            }
+            val unauthorized = installed.filter {
+                it.packageName != riyPackageName &&
+                    it.packageName !in allowedSet &&
+                    !it.isSystem &&
+                    discovery.hasLauncherActivity(it.packageName) &&
+                    !BlockedAppPolicy.isBlockedPackage(it.packageName, it.label)
+            }
+            // Explicit bypass apps: hide (invisible + unlaunchable) AND suspend
+            // (belt-and-braces if hidden is reverted externally).
+            explicitBlocked.forEach { pkg ->
+                val hid = devicePolicy.setApplicationHidden(admin, pkg.packageName, true)
+                val sus = devicePolicy.setPackagesSuspended(admin, listOf(pkg.packageName), true)
+                if (hid || sus) {
+                    recordIssue(
+                        "Blocked package neutralized: ${pkg.packageName} " +
+                            "(${BlockedAppPolicy.blockedCategoryFor(pkg.packageName, pkg.label)})",
+                    )
+                } else {
+                    recordIssue("Blocked package hardening FAILED (non-owner?): ${pkg.packageName}")
+                }
+            }
+            // Generic unauthorized sideloads: suspend (reversible, still visible).
+            if (unauthorized.isNotEmpty()) {
+                val names = unauthorized.map { it.packageName }
+                val ok = devicePolicy.setPackagesSuspended(admin, names, true)
+                recordIssue(
+                    if (ok) "Suspended ${names.size} unauthorized package(s): ${names.sorted()}"
+                    else "Suspension FAILED for unauthorized packages: ${names.sorted()}",
+                )
+            }
+        }.onFailure { e ->
+            recordIssue("Hardening sweep failed: ${e.javaClass.simpleName}")
+        }
+        // User restrictions: unknown-source installs, Private DNS, VPN config.
+        // Deliberately NOT setting no_install_apps / no_uninstall_apps: the
+        // former would break RIY's own verified self-update, the latter would
+        // block legitimate device management.
+        runCatching {
+            devicePolicy.addUserRestriction(
+                admin, com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
+                    .RESTRICTION_INSTALL_UNKNOWN_SOURCES,
+            )
+            devicePolicy.addUserRestriction(
+                admin, com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
+                    .RESTRICTION_CONFIG_PRIVATE_DNS,
+            )
+            devicePolicy.addUserRestriction(
+                admin, com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
+                    .RESTRICTION_CONFIG_VPN,
+            )
+        }.onFailure { e ->
+            recordIssue("User-restriction hardening failed: ${e.javaClass.simpleName}")
+        }
+    }
+
+    /**
+     * Releases all hardening: unhides/unsuspends previously neutralized
+     * packages and drops protected-mode user restrictions. Never touches
+     * uninstall protection or Device Owner. Never throws.
+     */
+    private fun clearHardening() {
+        if (!isDeviceOwner()) return
+        val admin = adminComponent()
+        runCatching {
+            val installed = runCatching { discovery.installedPackages() }.getOrElse { emptyList() }
+            val hardened = installed.filter {
+                it.packageName != riyPackageName &&
+                    (BlockedAppPolicy.isBlockedPackage(it.packageName, it.label) ||
+                        (!it.isSystem && discovery.hasLauncherActivity(it.packageName)))
+            }.map { it.packageName }
+            hardened.forEach { runCatching { devicePolicy.setApplicationHidden(admin, it, false) } }
+            if (hardened.isNotEmpty()) {
+                runCatching { devicePolicy.setPackagesSuspended(admin, hardened, false) }
+            }
+        }.onFailure { e ->
+            recordIssue("Hardening release failed: ${e.javaClass.simpleName}")
+        }
+        runCatching {
+            devicePolicy.clearUserRestriction(
+                admin, com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
+                    .RESTRICTION_INSTALL_UNKNOWN_SOURCES,
+            )
+            devicePolicy.clearUserRestriction(
+                admin, com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
+                    .RESTRICTION_CONFIG_PRIVATE_DNS,
+            )
+            devicePolicy.clearUserRestriction(
+                admin, com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
+                    .RESTRICTION_CONFIG_VPN,
+            )
+        }.onFailure { e ->
+            recordIssue("User-restriction release failed: ${e.javaClass.simpleName}")
+        }
+    }
+
+    /**
+     * Single-package hardening used by the install-time fast path
+     * ([com.vishal.riy.protection.integrity.PackageStateWatcher]): neutralize
+     * [packageName] immediately when a restriction is live, unless it is RIY
+     * itself or an allowlisted package. Returns true when the package was
+     * neutralized or needed no action.
+     */
+    fun hardenSinglePackage(packageName: String): Boolean {
+        if (packageName.isBlank()) return true
+        if (BlockedAppPolicy.isSelfPackage(packageName, riyPackageName)) return true
+        if (!isDeviceOwner()) return false
+        val expectation = expected.get()
+        val live = expectation?.session?.state.isRestrictedSession() == true
+        if (!live) return true
+        val allowedSet = runCatching { appPolicyResolver.resolveAllowedApps().map { it.packageName }.toSet() }
+            .getOrElse { emptySet() } + (expectation?.appliedPolicy?.allowedPackages.orEmpty())
+        if (packageName in allowedSet) return true
+        val admin = adminComponent()
+        val label = runCatching { discovery.packageLabel(packageName) }.getOrNull()
+        return if (BlockedAppPolicy.isBlockedPackage(packageName, label)) {
+            val hid = devicePolicy.setApplicationHidden(admin, packageName, true)
+            val sus = devicePolicy.setPackagesSuspended(admin, listOf(packageName), true)
+            if (hid || sus) recordIssue("Install-time block: $packageName neutralized")
+            hid || sus
+        } else {
+            // Unknown non-system launcher app installed mid-restriction:
+            // suspend it (default-deny at package level).
+            val isSystem = runCatching { discovery.installedPackages().firstOrNull { it.packageName == packageName }?.isSystem }
+                .getOrNull() ?: false
+            if (isSystem) return true
+            if (!runCatching { discovery.hasLauncherActivity(packageName) }.getOrDefault(true)) return true
+            val ok = devicePolicy.setPackagesSuspended(admin, listOf(packageName), true)
+            if (ok) recordIssue("Install-time suspend: unauthorized $packageName neutralized")
+            ok
         }
     }
 

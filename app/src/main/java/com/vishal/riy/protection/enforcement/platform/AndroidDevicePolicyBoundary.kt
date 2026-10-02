@@ -124,6 +124,123 @@ class AndroidDevicePolicyBoundary(
             false
         }
 
+    override fun setApplicationHidden(
+        admin: AdminComponent,
+        packageName: String,
+        hidden: Boolean,
+    ): Boolean {
+        val dpm = dpm ?: return false
+        return try {
+            dpm.setApplicationHidden(this.admin(admin), packageName, hidden)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "setApplicationHidden rejected by platform for $packageName", e)
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "setApplicationHidden failed for $packageName", e)
+            false
+        }
+    }
+
+    override fun isApplicationHidden(admin: AdminComponent, packageName: String): Boolean {
+        val dpm = dpm ?: return false
+        return try {
+            dpm.isApplicationHidden(this.admin(admin), packageName)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "isApplicationHidden rejected by platform", e)
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "isApplicationHidden failed", e)
+            false
+        }
+    }
+
+    override fun setPackagesSuspended(
+        admin: AdminComponent,
+        packageNames: List<String>,
+        suspended: Boolean,
+    ): Boolean {
+        val dpm = dpm ?: return false
+        if (packageNames.isEmpty()) return true
+        return try {
+            val failed = dpm.setPackagesSuspended(
+                this.admin(admin), packageNames.toTypedArray(), suspended,
+            )
+            if (failed.isNotEmpty()) {
+                Log.w(TAG, "setPackagesSuspended partially failed: ${failed.toList()}")
+            }
+            failed.isEmpty()
+        } catch (e: SecurityException) {
+            Log.e(TAG, "setPackagesSuspended rejected by platform", e)
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "setPackagesSuspended failed", e)
+            false
+        }
+    }
+
+    override fun getSuspendedPackages(
+        admin: AdminComponent,
+        packageNames: List<String>,
+    ): List<String> {
+        if (packageNames.isEmpty()) return emptyList()
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                packageNames.filter { pkg ->
+                    try {
+                        dpm?.isPackageSuspended(this.admin(admin), pkg) == true
+                    } catch (_: Exception) {
+                        false
+                    }
+                }
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getSuspendedPackages failed", e)
+            emptyList()
+        }
+    }
+
+    override fun addUserRestriction(admin: AdminComponent, restriction: String): Boolean {
+        val dpm = dpm ?: return false
+        return try {
+            dpm.addUserRestriction(this.admin(admin), restriction)
+            true
+        } catch (e: SecurityException) {
+            Log.e(TAG, "addUserRestriction rejected by platform: $restriction", e)
+            false
+        } catch (e: IllegalArgumentException) {
+            // Unknown restriction key on this API level — honest no-op.
+            Log.w(TAG, "addUserRestriction unsupported key: $restriction")
+            false
+        }
+    }
+
+    override fun clearUserRestriction(admin: AdminComponent, restriction: String): Boolean {
+        val dpm = dpm ?: return false
+        return try {
+            dpm.clearUserRestriction(this.admin(admin), restriction)
+            true
+        } catch (e: SecurityException) {
+            Log.e(TAG, "clearUserRestriction rejected by platform: $restriction", e)
+            false
+        } catch (e: IllegalArgumentException) {
+            Log.w(TAG, "clearUserRestriction unsupported key: $restriction")
+            false
+        }
+    }
+
+    override fun hasUserRestriction(admin: AdminComponent, restriction: String): Boolean {
+        return try {
+            val restrictions = dpm?.getUserRestrictions(this.admin(admin))
+            @Suppress("DEPRECATION")
+            restrictions?.getBoolean(restriction) == true
+        } catch (e: Exception) {
+            Log.e(TAG, "hasUserRestriction failed: $restriction", e)
+            false
+        }
+    }
+
     private companion object {
         const val TAG = "RiyDpmBoundary"
     }

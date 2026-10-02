@@ -40,6 +40,18 @@ class FakeDevicePolicyBoundary(
     /** Simulates the platform lying on read-back (used to prove verify-on-read). */
     var corruptLockTaskPackagesOnRead: Boolean = false
 
+    /** Modelled hidden packages (setApplicationHidden state). */
+    private val hiddenPackages: MutableSet<String> = mutableSetOf()
+
+    /** Modelled suspended packages (setPackagesSuspended state). */
+    private val suspendedPackages: MutableSet<String> = mutableSetOf()
+
+    /** Modelled user restrictions in force. */
+    private val userRestrictions: MutableSet<String> = mutableSetOf()
+
+    /** Simulates the platform rejecting hardening writes. */
+    var rejectHardeningWrites: Boolean = false
+
     // ---- modelled platform state ------------------------------------------
 
     private var lockTaskPackages: List<String> = emptyList()
@@ -97,6 +109,68 @@ class FakeDevicePolicyBoundary(
     /** Simulates an external actor (another DPM caller) changing the allowlist. */
     fun simulateExternalDrift(packages: List<String>) {
         lockTaskPackages = packages.toList()
+    }
+
+    override fun setApplicationHidden(
+        admin: AdminComponent,
+        packageName: String,
+        hidden: Boolean,
+    ): Boolean {
+        if (!isDeviceOwnerApp(admin.packageName)) return false
+        if (rejectHardeningWrites) return false
+        if (hidden) hiddenPackages += packageName else hiddenPackages -= packageName
+        return true
+    }
+
+    override fun isApplicationHidden(admin: AdminComponent, packageName: String): Boolean =
+        packageName in hiddenPackages
+
+    override fun setPackagesSuspended(
+        admin: AdminComponent,
+        packageNames: List<String>,
+        suspended: Boolean,
+    ): Boolean {
+        if (!isDeviceOwnerApp(admin.packageName)) return false
+        if (rejectHardeningWrites) return false
+        if (suspended) suspendedPackages += packageNames else suspendedPackages -= packageNames.toSet()
+        return true
+    }
+
+    override fun getSuspendedPackages(
+        admin: AdminComponent,
+        packageNames: List<String>,
+    ): List<String> = packageNames.filter { it in suspendedPackages }
+
+    override fun addUserRestriction(admin: AdminComponent, restriction: String): Boolean {
+        if (!isDeviceOwnerApp(admin.packageName)) return false
+        if (rejectHardeningWrites) return false
+        userRestrictions += restriction
+        return true
+    }
+
+    override fun clearUserRestriction(admin: AdminComponent, restriction: String): Boolean {
+        if (!isDeviceOwnerApp(admin.packageName)) return false
+        if (rejectHardeningWrites) return false
+        userRestrictions -= restriction
+        return true
+    }
+
+    override fun hasUserRestriction(admin: AdminComponent, restriction: String): Boolean =
+        restriction in userRestrictions
+
+    /** Direct read of modelled hidden packages (tests only). */
+    fun rawHiddenPackages(): Set<String> = hiddenPackages.toSet()
+
+    /** Direct read of modelled suspended packages (tests only). */
+    fun rawSuspendedPackages(): Set<String> = suspendedPackages.toSet()
+
+    /** Direct read of modelled user restrictions (tests only). */
+    fun rawUserRestrictions(): Set<String> = userRestrictions.toSet()
+
+    /** Simulates an external actor unhiding/un-suspending a package. */
+    fun simulateExternalUnhide(packageName: String) {
+        hiddenPackages -= packageName
+        suspendedPackages -= packageName
     }
 
     private companion object {

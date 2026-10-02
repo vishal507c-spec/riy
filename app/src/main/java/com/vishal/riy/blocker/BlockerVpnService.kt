@@ -140,11 +140,14 @@ class BlockerVpnService : VpnService() {
                     // in-memory expectation of a restriction is gone while the
                     // persisted session and the LockEngine deadline survive.
                     // Reconcile both directions BEFORE filtering resumes: a
-                    // live restriction is re-applied, an expired one cleared.
-                    // This is the existing recovery orchestrator, not a new
-                    // one, and it touches no deadline.
+                    // live restriction is re-applied, an expired one cleared,
+                    // and bypass packages are re-neutralized. Single entry
+                    // point (existing orchestrator + bypass sweep); touches no
+                    // deadline and creates no second state.
                     runCatching {
-                        ProtectionIntelligence.recoveryForContext(this).recover()
+                        com.vishal.riy.protection.integrity.ProtectionReconciler.reconcileAll(
+                            this, "vpn_sticky_restart",
+                        )
                     }.onFailure { e ->
                         Log.w(TAG, "recovery on sticky restart failed: ${e.message}")
                     }
@@ -160,8 +163,21 @@ class BlockerVpnService : VpnService() {
 
     override fun onRevoke() {
         // VPN consent revoked, Always-On disabled, or another VPN took over:
-        // protection is gone — report that honestly.
+        // protection is gone — report that honestly. The security event is
+        // recorded (no content, only the fact of revocation); recovery on next
+        // foreground/boot restores protection when the persisted session is
+        // still live.
         Log.w(TAG, "VPN revoked by system/user")
+        runCatching {
+            com.vishal.riy.protection.events.PrefsProtectionEventStore(this).append(
+                com.vishal.riy.protection.events.ProtectionLogEvent(
+                    eventId = "vpn-revoke-${System.currentTimeMillis()}",
+                    type = com.vishal.riy.protection.events.ProtectionLogEvent.Type.INTEGRITY_MISMATCH,
+                    timestamp = System.currentTimeMillis(),
+                    message = "VPN revoked by system/user; protection OFF until restored",
+                ),
+            )
+        }
         BlockerStateStore(this).setProtectionWanted(false)
         stopFiltering()
     }
@@ -331,6 +347,18 @@ class BlockerVpnService : VpnService() {
         val parsed = IpPacket.parseUdpDns(buffer, length) ?: return // non-DNS: drop
         val dns = buffer.copyOfRange(parsed.dnsStart, parsed.dnsStart + parsed.dnsLength)
         val question = DnsProtocol.question(dns) ?: return // malformed DNS: drop
+        // Bypass-transport block (SECONDARY protection, no porn lock): TeraBox /
+        // file-sharing CDN hostnames and well-known encrypted-DNS endpoints are
+        // sinkholed so alternate-DNS / DoH routes fall back to the filtered
+        // resolver. This is transport removal, NOT content classification: it
+        // never arms a detection, never inspects message/media content, and
+        // Telegram hostnames are deliberately never in this set.
+        if (com.vishal.riy.protection.enforcement.BlockedAppPolicy.isBypassDomain(question.name)) {
+            val response = DnsProtocol.buildBlockedResponse(dns) ?: return
+            Log.i(TAG, "bypass-transport blocked (no detection): '${question.name}'")
+            writeReply(output, IpPacket.buildReply(parsed, response))
+            return
+        }
         if (blocklist.contains(question.name)) {
             val response = DnsProtocol.buildBlockedResponse(dns) ?: return
             recordPornDetection(question.name)

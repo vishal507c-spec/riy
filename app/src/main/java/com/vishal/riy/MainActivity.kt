@@ -65,6 +65,16 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         restoreProtectionIfInterrupted()
+        // Foreground return: reconcile installed packages against the
+        // protected-mode policy (single entry point — catches installs that
+        // landed while RIY was dead). Never blocks the UI.
+        try {
+            com.vishal.riy.protection.integrity.ProtectionReconciler.reconcileAll(
+                this, "foreground",
+            )
+        } catch (e: Exception) {
+            Log.e("BlockerApp", "foreground reconciliation failed", e)
+        }
         // Re-register network callbacks (released in onStop) and replay any
         // pending Drive sync on EVERY foreground (never blocks UI).
         ensureNetworkObserver()

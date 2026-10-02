@@ -52,6 +52,7 @@
     <string name="app_name_riy">RIY</string>
     <string name="app_name_emergency">Emergency</string>
     <string name="app_name_keyboard">Keyboard</string>
+    <string name="app_name_telegram">Telegram</string>
 
     <!-- Truthful, percentage-free recovery progress -->
     <string name="recovery_step_checking">Checking protection…</string>

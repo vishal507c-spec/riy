@@ -94,6 +94,35 @@ class AndroidPackageDiscoveryBoundary(
 
     override fun packageLabel(packageName: String): String? = labelOf(packageName)
 
+    override fun installedPackages(): List<DiscoveredPackage> = try {
+        pm.getInstalledApplications(0)
+            .asSequence()
+            .map { it.packageName }
+            .distinct()
+            .map { pkg -> DiscoveredPackage(pkg, isSystemPackage(pkg), labelOf(pkg)) }
+            .toList()
+    } catch (e: Exception) {
+        Log.e(TAG, "installedPackages failed", e)
+        emptyList()
+    }
+
+    override fun isUnknownSource(packageName: String): Boolean = try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val info = pm.getInstallSourceInfo(packageName)
+            // An install with no initiating package is treated as sideloaded;
+            // Play/known stores report a non-blank installer package.
+            info.installingPackageName.isNullOrBlank()
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getInstallerPackageName(packageName).isNullOrBlank()
+        }
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    } catch (e: Exception) {
+        Log.e(TAG, "isUnknownSource failed for $packageName", e)
+        false
+    }
+
     // ------------------------------------------------------------------ priv
 
     private fun query(intent: Intent): List<DiscoveredPackage> = try {

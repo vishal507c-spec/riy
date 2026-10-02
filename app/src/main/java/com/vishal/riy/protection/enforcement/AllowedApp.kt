@@ -18,6 +18,15 @@ enum class AllowedAppCategory {
     /** A wallet/payment app explicitly approved by policy (for example GPay). */
     WALLET,
 
+    /**
+     * A legitimate communication app explicitly approved by policy (Telegram).
+     * Resolved from verified installed package metadata (known Telegram
+     * identities that are installed + enabled + launcher-backed). Telegram
+     * content itself is never inspected — this category only keeps the
+     * messenger launchable during a restriction.
+     */
+    COMMUNICATION,
+
     /** System functionality required for the device to remain usable. */
     SYSTEM_ESSENTIAL,
 

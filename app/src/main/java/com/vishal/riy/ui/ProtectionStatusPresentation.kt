@@ -125,6 +125,7 @@ fun AllowedApp.friendlyLabel(
     category == AllowedAppCategory.PHONE -> stringResource(R.string.app_name_phone)
     category == AllowedAppCategory.WALLET -> stringResource(R.string.app_name_wallet)
     category == AllowedAppCategory.EMERGENCY -> stringResource(R.string.app_name_emergency)
+    category == AllowedAppCategory.COMMUNICATION -> stringResource(R.string.app_name_telegram)
     else -> stringResource(R.string.app_name_keyboard)
 }
 
@@ -137,4 +138,5 @@ val AllowedAppCategory.isShownAsAvailable: Boolean
     get() = this == AllowedAppCategory.RIY ||
         this == AllowedAppCategory.PHONE ||
         this == AllowedAppCategory.WALLET ||
-        this == AllowedAppCategory.EMERGENCY
+        this == AllowedAppCategory.EMERGENCY ||
+        this == AllowedAppCategory.COMMUNICATION

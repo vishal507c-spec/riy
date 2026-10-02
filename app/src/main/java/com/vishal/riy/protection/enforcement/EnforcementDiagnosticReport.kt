@@ -22,6 +22,7 @@ package com.vishal.riy.protection.enforcement
  * @param walletPackage      the verified wallet package, or null if unresolved.
  * @param emergencyPackage   the verified emergency package, or null.
  * @param inputMethodPackage the keyboard package policy keeps available.
+ * @param telegramPackage    the verified Telegram package, or null if unresolved.
  * @param applicationResult  the outcome of the last apply attempt.
  * @param reconciliation     the outcome of the last reconciliation.
  * @param issues             enforcement/integrity notes worth recording.
@@ -55,6 +56,8 @@ data class EnforcementDiagnosticReport(
 
     val inputMethodPackage: String?,
 
+    val telegramPackage: String? = null,
+
     val applicationResult: PolicyApplicationResult,
 
     val reconciliation: ReconciliationResult,
@@ -78,6 +81,7 @@ data class EnforcementDiagnosticReport(
         appendLine("Wallet package      : ${walletPackage ?: "UNRESOLVED"}")
         appendLine("Emergency package   : ${emergencyPackage ?: "UNRESOLVED"}")
         appendLine("Input method        : ${inputMethodPackage ?: "UNRESOLVED"}")
+        appendLine("Telegram package    : ${telegramPackage ?: "UNRESOLVED"}")
         appendLine("Last apply result   : $applicationResult")
         appendLine("Reconciliation      : $reconciliation")
         if (issues.isNotEmpty()) {

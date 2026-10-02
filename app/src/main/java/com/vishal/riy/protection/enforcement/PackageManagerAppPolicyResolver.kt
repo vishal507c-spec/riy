@@ -26,8 +26,12 @@ import com.vishal.riy.protection.enforcement.platform.PackageDiscoveryBoundary
  *                   matches, the wallet is reported as unresolved (absent from
  *                   the list); policy copes without it.
  *  - EMERGENCY   : the platform's default handler of the emergency-dial action.
- *  - SYSTEM_ESSENTIAL : the user's selected input method, so restriction can
- *                  never take away the ability to type.
+ *  - SYSTEM_ESSENTIAL : the user's selected input method, so typing stays possible.
+ *  - COMMUNICATION : known Telegram identities that are verified installed,
+ *                  enabled and launcher-backed (see [BlockedAppPolicy]).
+ *                  Telegram content is never inspected; this only keeps the
+ *                  messenger launchable. Telegram is OPTIONAL for the safety
+ *                  gate (like WALLET): its absence never blocks a restriction.
  *
  * The strings below are the documented Android action values, spelled out as
  * plain Kotlin constants so that this class stays free of `android.*` imports
@@ -52,7 +56,7 @@ class PackageManagerAppPolicyResolver(
      * builds the platform allowlist is what collapses those to one package.
      */
     override fun resolveAllowedApps(): List<AllowedApp> =
-        dedupByPackageAndCategory(resolveEssentialApps() + resolveWalletApps())
+        dedupByPackageAndCategory(resolveEssentialApps() + resolveWalletApps() + resolveTelegramApps())
 
     /**
      * What the device genuinely needs to remain usable: RIY (so the UI can keep
@@ -138,6 +142,30 @@ class PackageManagerAppPolicyResolver(
                 )
             }
     }
+
+    // ----------------------------------------------------- COMMUNICATION
+    // Telegram must remain usable during a restriction for legitimate chats,
+    // groups, channels and notifications. Each known Telegram identity is
+    // allowed ONLY after it is verified installed + enabled + launcher-backed;
+    // a bare package-name match without that verification never allows.
+
+    /**
+     * Every Telegram app that is genuinely present and launchable. Empty when
+     * no Telegram variant is installed — policy then proceeds without it and
+     * reports it as unresolved (never fatal, like WALLET).
+     */
+    private fun resolveTelegramApps(): List<AllowedApp> =
+        BlockedAppPolicy.TELEGRAM_PACKAGES
+            .asSequence()
+            .filter { isSelectable(it) && discovery.hasLauncherActivity(it) }
+            .map {
+                AllowedApp(
+                    packageName = it,
+                    displayName = discovery.packageLabel(it) ?: it,
+                    category = AllowedAppCategory.COMMUNICATION,
+                )
+            }
+            .toList()
 
     // --------------------------------------------------------- EMERGENCY
 

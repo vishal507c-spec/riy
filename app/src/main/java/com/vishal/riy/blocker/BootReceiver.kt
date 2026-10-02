@@ -12,9 +12,22 @@ import android.util.Log
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
+            intent.action != Intent.ACTION_LOCKED_BOOT_COMPLETED
+        ) return
         val wanted = BlockerStateStore(context).isProtectionWanted()
         Log.i(TAG, "boot completed; protectionWanted=$wanted")
+        // Protection recovery must run even when the VPN cannot start yet:
+        // a live restriction is re-applied (or an expired one cleared) and
+        // bypass packages are re-neutralized through the single reconciler.
+        // This uses the existing recovery orchestrator — no second state.
+        try {
+            com.vishal.riy.protection.integrity.ProtectionReconciler.reconcileAll(
+                context, "boot_completed",
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "boot reconciliation failed", e)
+        }
         if (!wanted) return
         try {
             // Boot timing race: the system VPN state may not be ready yet, so

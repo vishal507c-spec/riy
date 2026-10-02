@@ -77,4 +77,23 @@ interface PackageDiscoveryBoundary {
      * is not installed or has no label.
      */
     fun packageLabel(packageName: String): String?
+
+    /**
+     * Every installed package visible to RIY, as raw platform fact.
+     * Used for default-deny reconciliation (installed-vs-allowed) and for
+     * metadata-based bypass detection (e.g. TeraBox-family substring/label
+     * matching). Classification into allowed/blocked stays with policy above
+     * this seam — this only enumerates what is present.
+     *
+     * Default implementation returns empty so older fakes keep compiling; the
+     * production boundary and current fakes override it.
+     */
+    fun installedPackages(): List<DiscoveredPackage> = emptyList()
+
+    /**
+     * True only if [packageName] was installed from an unknown source
+     * (sideloaded APK) where the platform reports it. Best-effort: unknown
+     * installers report false rather than throwing. Default false.
+     */
+    fun isUnknownSource(packageName: String): Boolean = false
 }
