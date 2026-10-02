@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.6.3 - 2026-10-02
+- Fix self-update blocked by own hardening: the Device Owner unknown-sources restriction (system shows "Blocked by your IT admin") also stopped RIY's verified update — the updater now lifts only that restriction for its own install, and reconciliation re-raises it automatically afterwards
+
 ## v2.6.2 - 2026-10-02
 - Device Owner grant/revocation now triggers immediate reconciliation: the admin receiver funnels into the single reconciliation entry point, so a live restriction is re-applied (or honestly reported unverifiable) the moment privileges change
 

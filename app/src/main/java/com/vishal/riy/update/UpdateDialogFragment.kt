@@ -156,6 +156,12 @@ class UpdateDialogFragment : DialogFragment() {
         }
         dismissProgress()
         dismiss()
+        // Self-update exemption FIRST: our own Device Owner hardening blocks
+        // unknown-source installs while protection is active (system shows
+        // "Blocked by your IT admin"), and a per-app grant cannot override a
+        // Device Owner restriction — so lift it for this verified update.
+        // Reconciliation re-raises it automatically afterwards.
+        UpdateInstaller.allowSelfUpdateInstall(ctx)
         // Android verifies the APK signature against the installed app here;
         // a mismatch is rejected by the OS.
         ctx.startActivity(UpdateInstaller.buildInstallIntent(ctx, apkFile))

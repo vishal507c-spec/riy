@@ -4,7 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import com.vishal.riy.R
+import com.vishal.riy.admin.RiyDeviceAdminReceiver
+import com.vishal.riy.protection.enforcement.platform.AdminComponent
+import com.vishal.riy.protection.enforcement.platform.AndroidDevicePolicyBoundary
+import com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -34,6 +39,7 @@ import java.net.URL
  */
 object UpdateInstaller {
 
+    private const val TAG = "RiyUpdateInstall"
     private const val CONNECT_TIMEOUT_MS = 15_000
     private const val READ_TIMEOUT_MS = 20_000
     private const val MAX_REDIRECTS = 5
@@ -198,6 +204,44 @@ object UpdateInstaller {
         if (info.packageName != context.packageName) return false
         val apkVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else info.versionCode.toLong()
         return apkVersionCode >= installedVersionCode
+    }
+
+    /**
+     * Self-update exemption. RIY's own Device Owner hardening raises
+     * `no_install_unknown_sources` while protection is active — which the
+     * system installer reports as "Blocked by your IT admin", including for
+     * RIY's own verified update (a per-app "install unknown apps" grant can
+     * never override a Device Owner restriction).
+     *
+     * So immediately before handing OUR verified APK to the system installer,
+     * a Device Owner RIY lifts ONLY that one restriction for its own update.
+     * Scope is deliberately narrow (unknown-sources only; Private-DNS and
+     * VPN-config restrictions stay), and the window closes itself: the next
+     * foreground/boot/package reconciliation re-raises it while protection is
+     * wanted, or the live restriction re-hardens it. Non-owners are a safe
+     * no-op (false). Never throws.
+     *
+     * @return true when the exemption was applied (Device Owner only).
+     */
+    fun allowSelfUpdateInstall(context: Context): Boolean {
+        return try {
+            val app = context.applicationContext
+            val devicePolicy = AndroidDevicePolicyBoundary(app)
+            if (!devicePolicy.isDeviceOwnerApp(app.packageName)) return false
+            val admin = AdminComponent(
+                app.packageName,
+                RiyDeviceAdminReceiver::class.java.name,
+            )
+            val cleared = devicePolicy.clearUserRestriction(
+                admin,
+                DevicePolicyBoundary.RESTRICTION_INSTALL_UNKNOWN_SOURCES,
+            )
+            Log.i(TAG, "self-update exemption applied=$cleared")
+            cleared
+        } catch (e: Exception) {
+            Log.w(TAG, "self-update exemption failed: ${e.javaClass.simpleName}")
+            false
+        }
     }
 
     /** Intent that hands the verified APK to the system installer. */
