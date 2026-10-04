@@ -148,4 +148,30 @@
     <string name="update_install_permission_title">Permission needed</string>
     <string name="update_install_permission_message">Allow installing apps from this source to complete the update. After granting the permission, tap “Update Now” again.</string>
     <string name="update_retry">Retry</string>
+
+    <!--
+        WhatsApp Status / Updates blocker (on-device UI guard).
+
+        Plain human language only: no package name, no engine name, no node,
+        no confidence value and no technical vocabulary is ever shown.
+    -->
+    <string name="status_blocker_title">WhatsApp Status</string>
+    <string name="status_blocker_state_blocked">BLOCKED</string>
+    <string name="status_blocker_toggle_label">Status Blocking</string>
+    <string name="status_blocker_toggle_on">Status Blocking ON</string>
+    <string name="status_blocker_toggle_off">Status Blocking OFF</string>
+    <string name="status_blocker_whatsapp">WhatsApp</string>
+    <string name="status_blocker_protected">Protected</string>
+    <string name="status_blocker_not_installed">Not installed</string>
+    <string name="status_blocker_explanation">WhatsApp chats and calls remain available. Status content is blocked.</string>
+    <string name="status_blocker_onboarding_title">Enable Protection</string>
+    <string name="status_blocker_onboarding_body">Accessibility access is required so the blocker can recognize and stop Status/Updates before the content opens.</string>
+    <string name="status_blocker_enable_accessibility">Enable Accessibility</string>
+    <string name="status_blocker_active">Protection Active</string>
+    <string name="status_blocker_blocked_notice">Status is blocked</string>
+    <string name="status_blocker_privacy">Only the Status screen is stopped. Nothing is recorded, read or sent anywhere.</string>
+
+    <!-- Shown by Android in the Accessibility settings list -->
+    <string name="status_blocker_a11y_label">RIY Status Blocker</string>
+    <string name="status_blocker_a11y_description">Stops WhatsApp Status / Updates from opening. WhatsApp itself, including chats, calls, groups and notifications, is left fully working. Nothing is recorded or sent anywhere.</string>
 </resources>

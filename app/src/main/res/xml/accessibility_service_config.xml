@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    MINIMUM-VIVILE SCOPE, BY CONSTRUCTION.
+
+    packageNames  : com.whatsapp only. The system never delivers another app's
+                    events to this service, so it cannot observe them at all.
+    eventTypes    : window state, window content and view-clicked only. No
+                    text-change, no item-click spam, no scroll/touch tracking.
+    flags         : reportViewIds (stable resource ids, not screen coordinates)
+                    + retrieveInteractiveWindows (to read the window after the
+                    navigation we want to undo).
+    description   : shown verbatim in Android Settings.
+
+    No capability is requested for typing, gestures, screenshots or global
+    interception. Nothing here can read a message body, a password or a
+    notification body.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewClicked"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/status_blocker_a11y_description"
+    android:notificationTimeout="200"
+    android:packageNames="com.whatsapp"
+    android:settingsActivity="com.vishal.riy.MainActivity" />

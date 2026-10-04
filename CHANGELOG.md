@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.7.0 - 2026-10-04
+- WhatsApp Status / Updates blocker: a new on-device UI guard stops the Status surface while leaving WhatsApp itself completely normal — chats, individual and group messages, calls, notifications, in-chat photos and videos, search and settings all keep working. Official WhatsApp is never modified, patched, decompiled, root-required or network-intercepted, and no manifest permission was added.
+- Generic, reusable blocking engine (`guard/`): `UiGuardRule` + `UiGuardEngine` are the single blocking system, and WhatsApp Status is just one target/rule (`WhatsAppStatusRule`). Adding another blocked surface means adding a rule, not a second blocker.
+- Version-resilient detection with no hard-coded coordinates: independent weighted indicators (status activity component, status resource-id package, selected Status/Updates nav tab, status-tab content labels, exact Status/Updates entry label, structural reply-bar viewer). Confirmation threshold is only crossed by strong evidence; anything uncertain is logged and left alone, because a false positive on a normal screen is worse than a missed block.
+- Safest available action only: a tapped entry merely arms the guard, the Status destination is exited with one in-app back-out (never a force-close, never a blind back-out on a normal screen), and back-outs are capped per attempt.
+- Accessibility service scoped to `com.whatsapp` only, with window-state/content/clicked events and no other capability; inspection is bounded (80 nodes / 14 levels) and nothing is recorded, stored or transmitted.
+- New dashboard card on the main screen: WhatsApp Status / BLOCKED, a Status Blocking toggle, WhatsApp / Protected, a plain-language explanation, and an onboarding card that explains exactly why accessibility access is needed and links straight to it. "Protection Active" appears only when the system confirms access.
+- Controlled debug logging for the four specified lines (`WhatsApp detected`, `Status candidate detected`, `Status blocked`, `Normal WhatsApp screen allowed`) lives in a debug-only source set, so none of it ships in the release APK; no message text or conversation content is ever logged.
+- 63 new JVM unit tests (detection, look-alike safety, action policy, full event-by-event user journey, UI mapping) alongside the existing 419 — all 482 pass.
+
 ## v2.6.3 - 2026-10-02
 - Fix self-update blocked by own hardening: the Device Owner unknown-sources restriction (system shows "Blocked by your IT admin") also stopped RIY's verified update — the updater now lifts only that restriction for its own install, and reconciliation re-raises it automatically afterwards
 

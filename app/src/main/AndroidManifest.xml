@@ -57,6 +57,11 @@
             <data android:scheme="upi" />
         </intent>
 
+        <!-- VISIBILITY ONLY: lets the status card honestly report whether
+             official WhatsApp is installed on this device. Grants no
+             permission and is never used to restrict or inspect WhatsApp. -->
+        <package android:name="com.whatsapp" />
+
     </queries>
 
     <application
@@ -143,6 +148,30 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!--
+            WhatsApp Status / Updates blocker.
+
+            The system (holder of BIND_ACCESSIBILITY_SERVICE) is the only party
+            that may bind it, and only after the user grants accessibility
+            access in Settings. Its configured scope is com.whatsapp ONLY — see
+            res/xml/accessibility_service_config.xml. Official WhatsApp is
+            neither modified, patched, intercepted nor restricted as a whole:
+            chats, calls, groups, notifications and settings are untouched, and
+            only the Status/Updates surface is stopped.
+        -->
+        <service
+            android:name=".guard.StatusBlockerService"
+            android:exported="true"
+            android:label="@string/status_blocker_a11y_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
 
         <!-- FileProvider used to hand the downloaded, verified update APK to the
              system package installer. The file lives in app-private storage
