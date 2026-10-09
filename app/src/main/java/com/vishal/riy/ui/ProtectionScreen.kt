@@ -193,9 +193,13 @@ internal fun ProtectionScreen(
         if (!state.isRestricted && !state.isRecovering) {
             Spacer(Modifier.height(8.dp))
             Button(
-                onClick = onEnableProtection,
-                enabled = blockerStatus != ShieldStatus.INITIALIZING &&
-                    blockerStatus != ShieldStatus.DISCONNECTED,
+onClick = onEnableProtection,
+                // Disabled ONLY while the tunnel is genuinely mid-handshake.
+                // It must stay enabled when protection is disconnected, failed
+                // or permission-blocked — those are precisely the states in which
+                // the user needs to press it. Disabling it there made recovery
+                // impossible.
+                enabled = blockerStatus != ShieldStatus.INITIALIZING,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.action_enable_protection))

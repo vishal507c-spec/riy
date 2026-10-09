@@ -75,7 +75,12 @@ class ProtectionViewModel(application: Application) : AndroidViewModel(applicati
      */
     fun enableProtection(context: Context) {
         stateStore.setProtectionWanted(true)
-        BlockerVpnService.start(context)
+        // allowRetry = false: this is a USER-initiated start, so the boot-retry
+        // budget must reset. With allowRetry=true the counter kept its previous
+        // value and, once the 12 boot attempts had been spent, every subsequent
+        // tap failed instantly instead of retrying — which is exactly how the
+        // button appeared to "do nothing".
+        BlockerVpnService.start(context, allowRetry = false)
     }
 
     private companion object {

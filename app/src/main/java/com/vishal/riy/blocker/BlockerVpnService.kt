@@ -194,11 +194,20 @@ class BlockerVpnService : VpnService() {
     // ---------------------------------------------------------------- state
 
     private fun startFiltering(allowRetry: Boolean = false) {
-        if (running.get()) {
+        if (running.get() && vpnInterface != null) {
             // Already live: keep the evidence we already have. Re-announcing
             // CONNECTED here would wipe the verified/unverified distinction.
             Log.i(TAG, "already running; keeping phase=${BlockerState.current().phase}")
             return
+        }
+        if (running.get()) {
+            // The flag outlived the interface (the filter thread died without
+            // clearing it). Trusting the flag alone made every later "Enable
+            // Protection" tap a silent no-op, so recover the real state first.
+            Log.w(TAG, "filter flagged running but the tun is gone; re-establishing")
+            running.set(false)
+            runCatching { vpnInterface?.close() }
+            vpnInterface = null
         }
         // Fresh (user-initiated) starts reset the retry counter; retries must
         // keep counting up or they would loop forever.
