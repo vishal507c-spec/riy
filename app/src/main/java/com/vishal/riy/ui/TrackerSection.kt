@@ -1,6 +1,7 @@
 package com.vishal.riy.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -40,15 +41,22 @@ fun TrackerEntryRow(
         colors = ButtonDefaults.buttonColors(containerColor = colorScheme.surfaceVariant),
     ) {
         Row(
-            modifier = Modifier.padding(vertical = 4.dp),
+            modifier = Modifier.padding(vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = stringResource(R.string.tracker_entry_title),
-                style = typography.titleMedium,
-                color = colorScheme.onSurface,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.tracker_entry_title),
+                    style = typography.titleMedium,
+                    color = colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(R.string.tracker_entry_subtitle),
+                    style = typography.bodySmall,
+                    color = colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

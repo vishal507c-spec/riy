@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.Text
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,19 +41,27 @@ fun SciFiFrame(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
-        CornerBrackets(color = headerColor, modifier = Modifier.fillMaxSize())
-        Text(
-            text = header,
-            style = typography.labelLarge,
-            color = headerColor.copy(alpha = 0.75f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .padding(top = 10.dp),
-        )
-        content()
+    // A bare Box leaves LocalContentColor at Color.Black, which made every
+    // un-styled Text on this dark theme render black-on-black and effectively
+    // unreadable. Publishing the theme's onBackground here fixes it once, for
+    // every screen built on this frame.
+    CompositionLocalProvider(LocalContentColor provides colorScheme.onBackground) {
+        Box(modifier = modifier.fillMaxSize()) {
+            CornerBrackets(color = headerColor, modifier = Modifier.fillMaxSize())
+            Text(
+                text = header,
+                style = typography.labelLarge,
+                color = headerColor.copy(alpha = 0.75f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    // Enough clearance that the header can never be overlapped
+                    // by the first content block underneath it.
+                    .padding(top = 10.dp),
+            )
+            content()
+        }
     }
 }
 

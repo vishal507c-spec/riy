@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vishal.riy.R
 import com.vishal.riy.tracker.TrackerCalendarDay
+import com.vishal.riy.tracker.TrackerDates
 import com.vishal.riy.tracker.TrackerStatus
 import com.vishal.riy.tracker.TrackerUiState
 import java.util.Locale
@@ -104,26 +106,35 @@ onDayClick: (Long) -> Unit,
                 }
             }
 
-            StatCard(
+StatCard(
                 label = stringResource(R.string.tracker_stat_yes_days),
+                hint = stringResource(R.string.tracker_hint_yes),
                 value = state.stats.yesDays,
                 accent = SciFiColors.SolarAmber,
             )
             StatCard(
                 label = stringResource(R.string.tracker_stat_no_days),
+                hint = stringResource(R.string.tracker_hint_no),
                 value = state.stats.noDays,
                 accent = SciFiColors.GoGreen,
             )
             StatCard(
                 label = stringResource(R.string.tracker_stat_current_streak),
+                hint = stringResource(R.string.tracker_hint_current_streak),
                 value = state.stats.currentStreak,
                 accent = SciFiColors.NeonCyan,
             )
             StatCard(
                 label = stringResource(R.string.tracker_stat_longest_streak),
+                hint = stringResource(R.string.tracker_hint_longest_streak),
                 value = state.stats.longestStreak,
                 accent = SciFiColors.NeonCyan,
             )
+
+            // THE "is my data actually saved?" line. Without this the screen
+            // looks identical whether nothing has been recorded or a year has
+            // been tracked, which is exactly what made it unreadable.
+            TrackerStatusLine(state)
 
             if (state.stats.unrecordedDays > 0) {
                 Text(
@@ -162,7 +173,7 @@ onDayClick: (Long) -> Unit,
 }
 
 @Composable
-private fun StatCard(label: String, value: Int, accent: Color) {
+private fun StatCard(label: String, hint: String, value: Int, accent: Color) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -173,22 +184,74 @@ private fun StatCard(label: String, value: Int, accent: Color) {
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = typography.labelLarge,
+                    color = colorScheme.onSurface,
+                )
+                Text(
+                    // A plain sentence explaining what the number counts, so the
+                    // figure never has to be interpreted by guesswork.
+                    text = hint,
+                    style = typography.bodySmall,
+                    color = colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.size(12.dp))
             Text(
-                text = label,
-                style = typography.labelLarge,
-                color = colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                // A real number, or an honest zero. Never a fabricated sample.
+                // Real persisted value, or an honest 0. Never a sample figure.
                 text = value.toString(),
                 style = typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = accent,
             )
+            Spacer(Modifier.size(4.dp))
+            Text(
+                text = stringResource(R.string.tracker_unit_days),
+                style = typography.bodySmall,
+                color = colorScheme.onSurfaceVariant,
+            )
         }
+    }
+}
+
+/**
+ * The honest "what is stored right now" line: how many days have an entry,
+ * when the most recent one was, and since when tracking exists. This is the
+ * answer to "is my data actually being saved?".
+ */
+@Composable
+private fun TrackerStatusLine(state: TrackerUiState) {
+    val stats = state.stats
+    val text = when {
+        stats.recordedDays == 0 -> stringResource(R.string.tracker_status_empty)
+        stats.latestRecordedDay != null -> stringResource(
+            R.string.tracker_status_summary,
+            stats.recordedDays,
+            TrackerDates.formatDate(stats.latestRecordedDay, TimeZone.getDefault()),
+            TrackerDates.formatDate(stats.trackingStartDay!!, TimeZone.getDefault()),
+        )
+        else -> stringResource(R.string.tracker_status_empty)
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (stats.recordedDays == 0) {
+                colorScheme.surfaceVariant
+            } else {
+                SciFiColors.GoGreen.copy(alpha = 0.12f)
+            },
+        ),
+    ) {
+        Text(
+            text = text,
+            style = typography.bodyMedium,
+            color = colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+        )
     }
 }
 

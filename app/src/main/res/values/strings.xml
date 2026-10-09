@@ -162,8 +162,19 @@
          health claims. The tracker reports recorded days and nothing else, and
          the numbers always come from real persisted data. -->
     <string name="tracker_entry_title">Open Daily Tracker</string>
+    <string name="tracker_entry_subtitle">Track your days</string>
     <string name="tracker_title">RIY SHIELD</string>
-    <string name="tracker_subtitle">Daily Tracker</string>
+    <string name="tracker_subtitle">Daily Tracker — tap any date below to add or change that day.</string>
+
+    <!-- Every number is explained in a plain sentence, and carries its unit, so
+         no figure on this screen has to be interpreted by guesswork. -->
+    <string name="tracker_unit_days">days</string>
+    <string name="tracker_hint_yes">Days you recorded YES</string>
+    <string name="tracker_hint_no">Days you recorded NO</string>
+    <string name="tracker_hint_current_streak">NO days in a row, up to yesterday</string>
+    <string name="tracker_hint_longest_streak">Best NO run you have ever had</string>
+    <string name="tracker_status_empty">No entries yet. Use yesterday\'s check-in, or tap a date below to add one.</string>
+    <string name="tracker_status_summary">%1$d day(s) saved. Last entry: %2$s. Tracking since %3$s.</string>
 
     <string name="tracker_stat_yes_days">MASTURBATION DAYS</string>
     <string name="tracker_stat_no_days">NON-MASTURBATION DAYS</string>

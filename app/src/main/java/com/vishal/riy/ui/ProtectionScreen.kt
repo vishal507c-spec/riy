@@ -170,13 +170,16 @@ internal fun ProtectionScreen(
         Spacer(Modifier.height(8.dp))
 
         // 4. One primary status card.
-        PrimaryStatusCard(state, blockerStatus)
+PrimaryStatusCard(state, blockerStatus)
+
+        // 4a. The Daily Tracker, placed directly under the status so it is
+        //     reachable immediately instead of being buried further down.
+        TrackerEntryRow(onOpen = onOpenTracker)
 
         // 4b. The WhatsApp Status guard — the app's primary feature card.
         //     Rendered straight after the primary status so it reads as the
         //     headline capability, without disturbing anything below it.
         WhatsAppStatusSection()
-        TrackerEntryRow(onOpen = onOpenTracker)
 
         // 5. Optional Protection Details, in normal language.
         ProtectionDetailsCard(state)
