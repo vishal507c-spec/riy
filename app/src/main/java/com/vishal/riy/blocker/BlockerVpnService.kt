@@ -366,16 +366,28 @@ class BlockerVpnService : VpnService() {
     // ------------------------------------------------------------------ vpn
 
     private fun establishVpn(): ParcelFileDescriptor? {
+        // Addresses that belong to the OS's own Private DNS (DoT) resolver.
+        // Capturing these is what made the whole phone report "No internet":
+        // Android applies Private DNS to the VPN network too, so breaking these
+        // breaks the system resolver, and the connectivity probe then fails.
+        val exempt = EncryptedDnsInspector.privateDnsAddressesToExempt(this)
+        if (exempt.isNotEmpty()) {
+            Log.i(TAG, "private DNS active; not intercepting ${exempt.size} resolver address(es)")
+        }
         val builder = Builder()
             .setSession(getString(R.string.blocker_vpn_session))
             .setMtu(VPN_MTU)
             .addAddress(VPN_ADDRESS, 32)
             .addDnsServer(VPN_DNS_ADDRESS)
             .addRoute(VPN_DNS_ADDRESS, 32)
-        for (ip in INTERCEPTED_RESOLVERS_V4) builder.addRoute(ip, 32)
+        for (ip in INTERCEPTED_RESOLVERS_V4) {
+            if (ip !in exempt) builder.addRoute(ip, 32)
+        }
         try {
             builder.addAddress(VPN_ADDRESS_V6, 128)
-            for (ip in INTERCEPTED_RESOLVERS_V6) builder.addRoute(ip, 128)
+            for (ip in INTERCEPTED_RESOLVERS_V6) {
+                if (ip !in exempt) builder.addRoute(ip, 128)
+            }
         } catch (e: Exception) {
             // IPv6 interception is best-effort; devices without v6 support in
             // VPN fall back to IPv4 DNS, which is filtered anyway.
@@ -434,13 +446,18 @@ class BlockerVpnService : VpnService() {
         val parsed = IpPacket.parseUdpDns(buffer, length) ?: return // non-DNS: drop
         val dns = buffer.copyOfRange(parsed.dnsStart, parsed.dnsStart + parsed.dnsLength)
         val question = DnsProtocol.question(dns) ?: return // malformed DNS: drop
-        // Bypass-transport block (SECONDARY protection, no porn lock): TeraBox /
-        // file-sharing CDN hostnames and well-known encrypted-DNS endpoints are
-        // sinkholed so alternate-DNS / DoH routes fall back to the filtered
+        // Sinkholed so apps using their own DoH/DoT fall back to the filtered
         // resolver. This is transport removal, NOT content classification: it
         // never arms a detection, never inspects message/media content, and
         // Telegram hostnames are deliberately never in this set.
-        if (com.vishal.riy.protection.enforcement.BlockedAppPolicy.isBypassDomain(question.name)) {
+        //
+        // ONE EXCEPTION: the device's own configured Private DNS hostname is
+        // left resolvable. Android resolves it to bootstrap DoT for the whole
+        // device, so blocking it killed ALL name resolution and the phone
+        // reported "No internet" on a healthy Wi-Fi.
+        if (!EncryptedDnsInspector.isDevicePrivateDnsHost(this, question.name) &&
+            com.vishal.riy.protection.enforcement.BlockedAppPolicy.isBypassDomain(question.name)
+        ) {
             val response = DnsProtocol.buildBlockedResponse(dns) ?: return
             Log.i(TAG, "bypass-transport blocked (no detection): '${question.name}'")
             writeReply(output, IpPacket.buildReply(parsed, response))
