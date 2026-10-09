@@ -1,9 +1,12 @@
 package com.vishal.riy
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
@@ -21,6 +24,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 /** TEMPORARY diagnostic tag; never contains credentials. */
@@ -35,7 +39,18 @@ private const val LOG_TAG = "RiyUpdate"
  */
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        /** Set by the morning notification so the app opens on the check-in. */
+        const val EXTRA_OPEN_CHECK_IN = "com.vishal.riy.OPEN_CHECK_IN"
+    }
+
     private lateinit var updatePreferences: UpdatePreferences
+
+    /**
+     * Latched so the Compose tree can react to the notification deep-link even
+     * when the Activity was already running (singleTop → onNewIntent).
+     */
+    private val openCheckIn = MutableStateFlow(false)
 
     // Pending update + lifecycle-safe dialog showing (see showUpdateDialogIfReady).
     private var pendingUpdate: ReleaseInfo? = null
@@ -54,12 +69,27 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // Cockpit soundboard (best-effort; never blocks startup).
         com.vishal.riy.ui.SciFiSound.init(this)
-        setContent { RiyApp() }
+        openCheckIn.value = intent?.getBooleanExtra(EXTRA_OPEN_CHECK_IN, false) == true
+        setContent {
+            val open by openCheckIn.collectAsState()
+            RiyApp(openCheckInOnStart = open)
+        }
         updatePreferences = UpdatePreferences(this)
         scheduleUpdateCheck()
         restoreProtectionIfInterrupted()
         protectUninstallIfOwner()
         installDriveBackup()
+        // The morning reminder is re-armed from its persisted preference on
+        // every start, so it survives an APK update that changed the default.
+        runCatching { com.vishal.riy.tracker.TrackerReminder.rescheduleFromPreferences(this) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_OPEN_CHECK_IN, false)) {
+            openCheckIn.value = true
+        }
     }
 
     override fun onStart() {

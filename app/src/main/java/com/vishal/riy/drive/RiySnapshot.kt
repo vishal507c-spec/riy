@@ -16,10 +16,18 @@ import org.json.JSONObject
  *  - riy_protection_events_prefs (event log ring buffer)
  *  - riy_escalation_state_prefs (escalation counting)
  *  - riy_observation_prefs      (intelligence observations)
+ *  - riy_tracker_prefs          (daily tracker YES/NO/UNKNOWN history)
  *
  * Encoding is deterministic (sorted store names, sorted keys, sorted string
  * sets, type-tagged values) so identical local state always yields identical
  * bytes → uploads are idempotent with zero writes on no-change.
+ *
+ * SCHEMA COMPATIBILITY: [FORMAT_VERSION] is deliberately NOT bumped for the
+ * addition of riy_tracker_prefs. A store that is absent simply contributes no
+ * object to the document, and [parse] ignores unknown store names — so a VAULT
+ * written before the tracker existed restores normally, and a VAULT containing
+ * tracker records restores into an older app that ignores them. Both
+ * directions are lossless for the data each version actually owns.
  *
  * Pure JVM: no Android import, fully unit-testable.
  */
@@ -27,7 +35,12 @@ object RiySnapshot {
 
     const val FORMAT_VERSION = 1
 
-    /** Exact SharedPreferences file names snapshotted, in canonical order. */
+    /**
+     * Exact SharedPreferences file names snapshotted, in canonical (alphabetical)
+     * order. The order is part of the byte-level contract: the snapshot is
+     * content-addressed by SHA-256, so this list must stay sorted and only ever
+     * gain APPENDED entries, or every existing VAULT would appear to change.
+     */
     val STORE_FILES: List<String> = listOf(
         "blocker_state_prefs",
         "riy_escalation_state_prefs",
@@ -35,6 +48,7 @@ object RiySnapshot {
         "riy_observation_prefs",
         "riy_protection_events_prefs",
         "riy_protection_state_prefs",
+        "riy_tracker_prefs",
     )
 
     /**

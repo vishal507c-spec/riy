@@ -691,12 +691,24 @@ class AndroidEnforcementEngine(
             )
             devicePolicy.clearUserRestriction(
                 admin, com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
-                    .RESTRICTION_CONFIG_PRIVATE_DNS,
-            )
-            devicePolicy.clearUserRestriction(
-                admin, com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
                     .RESTRICTION_CONFIG_VPN,
             )
+            // The private-DNS restriction is NOT purely a restriction-phase
+            // control: while the DNS filter is live it is the only supported
+            // Android control that keeps the system resolver (and therefore a
+            // DNS-over-TLS provider) off the filtered resolver. Clearing it here
+            // would silently re-open that bypass the moment a session ends, so
+            // it is released only when the filter itself is not running.
+            if (!com.vishal.riy.blocker.BlockerState.current().phase.let {
+                    it == com.vishal.riy.blocker.BlockerState.Phase.CONNECTED ||
+                        it == com.vishal.riy.blocker.BlockerState.Phase.INITIALIZING
+                }
+            ) {
+                devicePolicy.clearUserRestriction(
+                    admin, com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
+                        .RESTRICTION_CONFIG_PRIVATE_DNS,
+                )
+            }
         }.onFailure { e ->
             recordIssue("User-restriction release failed: ${e.javaClass.simpleName}")
         }

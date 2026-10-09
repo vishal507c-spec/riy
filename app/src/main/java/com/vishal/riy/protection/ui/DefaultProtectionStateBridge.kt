@@ -1,6 +1,10 @@
 package com.vishal.riy.protection.ui
 
 import com.vishal.riy.blocker.BlockerState
+import com.vishal.riy.blocker.BlockerStateStore
+import com.vishal.riy.blocker.ShieldStatus
+import com.vishal.riy.blocker.encryptedDnsBypassPossible
+import com.vishal.riy.blocker.shieldStatusOf
 import com.vishal.riy.lock.LockEngine
 import com.vishal.riy.lock.LockStore
 import com.vishal.riy.lock.PrefsLockStore
@@ -87,6 +91,13 @@ class DefaultProtectionStateBridge(
 
     private val eventStore: ProtectionEventStore,
 
+    /**
+     * The user's persisted protection ON/OFF choice. Supplied by the production
+     * graph so the bridge can tell "switched off" from "switched on but not
+     * working" — two states that look identical from the VPN phase alone.
+     */
+    private val protectionWanted: () -> Boolean = { false },
+
     private val clock: () -> Long = System::currentTimeMillis,
 
     ) : ProtectionStateBridge {
@@ -152,6 +163,8 @@ class DefaultProtectionStateBridge(
             blockedAppCount = session?.blockedCount ?: 0,
             recentEvents = eventStore.recent(),
             restrictedReason = session?.takeIf { it.state.isRestrictedSession() }?.reason,
+            shieldStatus = shieldStatus(),
+            encryptedDnsBypassPossible = encryptedDnsBypassPossible(BlockerState.current()),
         )
     }
 
@@ -203,9 +216,17 @@ class DefaultProtectionStateBridge(
         IntegrityStatus.UNKNOWN
     }
 
-    /** True only while the filtering VPN is genuinely connected. */
-    private fun isFilteringActive(): Boolean =
-        BlockerState.current().phase == BlockerState.Phase.CONNECTED
+    /**
+     * The filter's real status, derived from evidence rather than from "the VPN
+     * service started". [protectionActive] is true only while the filter is
+     * genuinely running AND still able to block.
+     */
+    private fun shieldStatus(): ShieldStatus {
+        val snapshot = BlockerState.current()
+        return shieldStatusOf(snapshot, protectionWanted())
+    }
+
+    private fun isFilteringActive(): Boolean = shieldStatus().isFiltering
 
     /**
      * The allowed apps are resolved only when a restriction is actually live —
@@ -255,6 +276,7 @@ class DefaultProtectionStateBridge(
                 integrity = DefaultIntegrityEngine(app),
                 appPolicyResolver = PackageManagerAppPolicyResolver(discovery, riyPackageName),
                 eventStore = eventStore,
+                protectionWanted = { BlockerStateStore(app).isProtectionWanted() },
             )
         }
     }

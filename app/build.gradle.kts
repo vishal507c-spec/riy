@@ -143,6 +143,15 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+
+    // Put src/main/assets on the unit-test classpath so the JVM suite can
+    // assert against the blocklist the APK actually ships, instead of a copy
+    // that could drift from it.
+    sourceSets {
+        getByName("test") {
+            resources.srcDir("src/main/assets")
+        }
+    }
 }
 
 dependencies {

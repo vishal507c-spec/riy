@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The XML side of the RIY palette, mirroring ui/Theme.kt SciFiColors exactly so
+    the native update dialogs and the Compose screens are visually one app.
+-->
+<resources>
+    <color name="riy_void">#FF04070D</color>
+    <color name="riy_hull">#FF0A1420</color>
+    <color name="riy_console">#FF0E1C2E</color>
+    <color name="riy_cyan">#FF00E5FF</color>
+    <color name="riy_cyan_depth">#FF062B36</color>
+    <color name="riy_amber">#FFFFB300</color>
+    <color name="riy_red">#FFFF4D3D</color>
+    <color name="riy_green">#FF3DFF88</color>
+    <color name="riy_telemetry">#FF7D93A8</color>
+    <color name="riy_text">#FFE8F4FF</color>
+    <color name="riy_outline">#FF1E3242</color>
+</resources>

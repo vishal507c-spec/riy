@@ -4,12 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.util.Log
-import com.vishal.riy.R
-import com.vishal.riy.admin.RiyDeviceAdminReceiver
-import com.vishal.riy.protection.enforcement.platform.AdminComponent
-import com.vishal.riy.protection.enforcement.platform.AndroidDevicePolicyBoundary
-import com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -32,9 +26,13 @@ import java.net.URL
  *  - Downloaded into app-private storage to a temp file first; only moved
  *    ([commitApk]) to the final APK path after the download completes with the
  *    expected size.
- *  - Before installation the APK is verified with [verifyApk]: it must be a
- *    parseable package, match our own package name and never be a downgrade.
- *    Android then enforces the signature check at install time.
+ *  - Before installation the APK is verified by [ApkCompatibility] +
+ *    [InstallEnvironmentProbe]: it must be a parseable package, match our own
+ *    package name, not be a downgrade, and carry the SAME signing certificate
+ *    as the installed app. Android then re-checks the signature itself.
+ *  - Installation is performed by [PackageInstallerLauncher] using a real
+ *    `PackageInstaller` session, so success / cancel / policy-block / failure
+ *    are all reported instead of guessed.
  *  - All network/file work runs on [Dispatchers.IO]; the main thread never does I/O.
  */
 object UpdateInstaller {
@@ -185,76 +183,18 @@ object UpdateInstaller {
         Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
             .setData(Uri.parse("package:${context.packageName}"))
 
-    /**
-     * Verifies a (downloaded) APK before installation:
-     *  1. it is a parseable Android package;
-     *  2. its package name equals our own applicationId;
-     *  3. its versionCode is >= the installed one (never a downgrade).
-     * Signature identity is enforced by the OS during installation.
-     */
-    fun verifyApk(context: Context, apkFile: File, installedVersionCode: Long): Boolean {
-        if (!apkFile.exists() || apkFile.length() == 0L) return false
-        val pm = context.packageManager
-        val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            pm.getPackageArchiveInfo(apkFile.absolutePath, android.content.pm.PackageManager.PackageInfoFlags.of(0))
-        } else {
-            @Suppress("DEPRECATION")
-            pm.getPackageArchiveInfo(apkFile.absolutePath, 0)
-        } ?: return false
-        if (info.packageName != context.packageName) return false
-        val apkVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else info.versionCode.toLong()
-        return apkVersionCode >= installedVersionCode
-    }
-
-    /**
-     * Self-update exemption. RIY's own Device Owner hardening raises
-     * `no_install_unknown_sources` while protection is active — which the
-     * system installer reports as "Blocked by your IT admin", including for
-     * RIY's own verified update (a per-app "install unknown apps" grant can
-     * never override a Device Owner restriction).
-     *
-     * So immediately before handing OUR verified APK to the system installer,
-     * a Device Owner RIY lifts ONLY that one restriction for its own update.
-     * Scope is deliberately narrow (unknown-sources only; Private-DNS and
-     * VPN-config restrictions stay), and the window closes itself: the next
-     * foreground/boot/package reconciliation re-raises it while protection is
-     * wanted, or the live restriction re-hardens it. Non-owners are a safe
-     * no-op (false). Never throws.
-     *
-     * @return true when the exemption was applied (Device Owner only).
-     */
-    fun allowSelfUpdateInstall(context: Context): Boolean {
-        return try {
-            val app = context.applicationContext
-            val devicePolicy = AndroidDevicePolicyBoundary(app)
-            if (!devicePolicy.isDeviceOwnerApp(app.packageName)) return false
-            val admin = AdminComponent(
-                app.packageName,
-                RiyDeviceAdminReceiver::class.java.name,
-            )
-            val cleared = devicePolicy.clearUserRestriction(
-                admin,
-                DevicePolicyBoundary.RESTRICTION_INSTALL_UNKNOWN_SOURCES,
-            )
-            Log.i(TAG, "self-update exemption applied=$cleared")
-            cleared
-        } catch (e: Exception) {
-            Log.w(TAG, "self-update exemption failed: ${e.javaClass.simpleName}")
-            false
-        }
-    }
-
-    /** Intent that hands the verified APK to the system installer. */
-    fun buildInstallIntent(context: Context, apkFile: File): Intent {
-        val uri = androidx.core.content.FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            apkFile,
-        )
-        return Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-    }
+    // ---------------------------------------------------------------------
+    // DELEGATED ON PURPOSE.
+    //
+    // APK verification used to live here as a weak check (parseable, right
+    // package, not a downgrade). It now lives in [ApkCompatibility] +
+    // [InstallEnvironmentProbe], which additionally verify the SIGNING
+    // CERTIFICATE against the installed app before anything is installed, and
+    // it returns a decision + reason instead of a bare boolean. Keeping an
+    // older, weaker verifier next to it would invite a future caller to use the
+    // wrong one, so it was removed rather than left dormant.
+    //
+    // Installation itself is likewise delegated to [PackageInstallerLauncher]
+    // (a real session API with a real result) instead of the deprecated
+    // ACTION_INSTALL_PACKAGE intent.
 }

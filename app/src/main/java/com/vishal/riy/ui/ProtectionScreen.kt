@@ -1,4 +1,4 @@
-﻿package com.vishal.riy.ui
+package com.vishal.riy.ui
 
 import android.app.Activity
 import android.content.Context
@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,6 +42,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vishal.riy.BuildConfig
 import com.vishal.riy.R
 import com.vishal.riy.blocker.BlockerState
+import com.vishal.riy.blocker.BlockerStateStore
+import com.vishal.riy.blocker.ShieldStatus
+import com.vishal.riy.blocker.shieldStatusOf
 import com.vishal.riy.protection.ui.ProtectionUiState
 
 /**
@@ -63,11 +67,18 @@ import com.vishal.riy.protection.ui.ProtectionUiState
 @Composable
 fun ProtectionScreen(
     modifier: Modifier = Modifier,
+    onOpenTracker: () -> Unit = {},
     viewModel: ProtectionViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val blockerSnapshot = BlockerState.current()
+    // The user's persisted ON/OFF choice is what separates "switched off" from
+    // "switched on but broken"; the phase alone cannot tell them apart.
+    val protectionWanted = remember(blockerSnapshot.phase) {
+        BlockerStateStore(context).isProtectionWanted()
+    }
+    val blockerStatus = shieldStatusOf(blockerSnapshot, protectionWanted)
 
     // VPN consent (system dialog) â€” on approval the service actually starts.
     val vpnConsentLauncher = rememberLauncherForActivityResult(
@@ -82,10 +93,10 @@ fun ProtectionScreen(
 
     ProtectionScreen(
         state = state,
-        blockerPhase = blockerSnapshot.phase,
+        blockerStatus = blockerStatus,
         // The single UI action. It goes through the system VPN consent dialog
         // first; consent is never assumed and never implied.
-        onEnableProtection = {
+onEnableProtection = {
             // Shield power-up sweep, then the normal consent/start path.
             SciFiSound.engage()
             val consentIntent = VpnService.prepare(context)
@@ -95,6 +106,7 @@ fun ProtectionScreen(
                 viewModel.enableProtection(context)
             }
         },
+        onOpenTracker = onOpenTracker,
         modifier = modifier,
     )
 }
@@ -106,8 +118,9 @@ fun ProtectionScreen(
 @Composable
 internal fun ProtectionScreen(
     state: ProtectionUiState,
-    blockerPhase: BlockerState.Phase,
+    blockerStatus: ShieldStatus,
     onEnableProtection: () -> Unit,
+    onOpenTracker: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val presentation = state.userFacing()
@@ -135,7 +148,7 @@ internal fun ProtectionScreen(
         ShieldOrb(
             icon = presentation.icon,
             glow = SciFiColors.NeonCyan,
-            breathing = blockerPhase == BlockerState.Phase.CONNECTED,
+            breathing = blockerStatus == ShieldStatus.VERIFIED,
         )
 
         // 2. One large title.
@@ -157,12 +170,13 @@ internal fun ProtectionScreen(
         Spacer(Modifier.height(8.dp))
 
         // 4. One primary status card.
-        PrimaryStatusCard(state, blockerPhase)
+        PrimaryStatusCard(state, blockerStatus)
 
         // 4b. The WhatsApp Status guard — the app's primary feature card.
         //     Rendered straight after the primary status so it reads as the
         //     headline capability, without disturbing anything below it.
         WhatsAppStatusSection()
+        TrackerEntryRow(onOpen = onOpenTracker)
 
         // 5. Optional Protection Details, in normal language.
         ProtectionDetailsCard(state)
@@ -180,7 +194,8 @@ internal fun ProtectionScreen(
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = onEnableProtection,
-                enabled = blockerPhase != BlockerState.Phase.CONNECTING,
+                enabled = blockerStatus != ShieldStatus.INITIALIZING &&
+                    blockerStatus != ShieldStatus.DISCONNECTED,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.action_enable_protection))
@@ -205,18 +220,22 @@ internal fun ProtectionScreen(
 @Composable
 private fun PrimaryStatusCard(
     state: ProtectionUiState,
-    phase: BlockerState.Phase,
+    status: ShieldStatus,
 ) {
+    val broken = status == ShieldStatus.FILTER_FAILED || status == ShieldStatus.PERMISSION_MISSING
+    val filtering = status.isFiltering
     val container = when {
-        phase == BlockerState.Phase.FAILED -> colorScheme.errorContainer
-        phase == BlockerState.Phase.CONNECTED -> colorScheme.primaryContainer
-        phase == BlockerState.Phase.CONNECTING -> colorScheme.tertiaryContainer
+        broken -> colorScheme.errorContainer
+        filtering -> colorScheme.primaryContainer
+        status == ShieldStatus.INITIALIZING || status == ShieldStatus.DISCONNECTED ->
+            colorScheme.tertiaryContainer
         else -> colorScheme.surfaceVariant
     }
     val content = when {
-        phase == BlockerState.Phase.FAILED -> colorScheme.onErrorContainer
-        phase == BlockerState.Phase.CONNECTED -> colorScheme.onPrimaryContainer
-        phase == BlockerState.Phase.CONNECTING -> colorScheme.onTertiaryContainer
+        broken -> colorScheme.onErrorContainer
+        filtering -> colorScheme.onPrimaryContainer
+        status == ShieldStatus.INITIALIZING || status == ShieldStatus.DISCONNECTED ->
+            colorScheme.onTertiaryContainer
         else -> colorScheme.onSurfaceVariant
     }
 
@@ -238,17 +257,17 @@ private fun PrimaryStatusCard(
                 Box(
                     modifier = Modifier
                         .size(12.dp)
-                        .background(dotColor(phase), CircleShape),
+                        .background(dotColor(status), CircleShape),
                 )
                 Text(
-                    text = stringResource(R.string.protection_active_line),
+                    text = stringResource(statusLabelRes(status)),
                     style = typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = content,
                 )
             }
             Text(
-                text = filterDetail(phase),
+                text = filterDetail(status),
                 style = typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = content,
@@ -257,19 +276,47 @@ private fun PrimaryStatusCard(
     }
 }
 
-@Composable
-private fun filterDetail(phase: BlockerState.Phase): String = when (phase) {
-    BlockerState.Phase.CONNECTED -> stringResource(R.string.filter_on)
-    BlockerState.Phase.CONNECTING -> stringResource(R.string.filter_connecting)
-    BlockerState.Phase.FAILED -> stringResource(R.string.filter_failed)
-    BlockerState.Phase.OFF -> stringResource(R.string.filter_off)
+/**
+ * The card's headline. It must never read "Protection Active" for a state that
+ * is not protecting the device, which is why every unverified/broken value gets
+ * its own label instead of inheriting a generic green one.
+ */
+private fun statusLabelRes(status: ShieldStatus): Int = when (status) {
+    ShieldStatus.VERIFIED -> R.string.filter_label_verified
+    ShieldStatus.RUNNING_UNVERIFIED -> R.string.filter_label_unverified
+    ShieldStatus.INITIALIZING -> R.string.filter_label_starting
+    ShieldStatus.UNKNOWN -> R.string.filter_label_starting
+    ShieldStatus.PERMISSION_MISSING -> R.string.filter_label_permission_missing
+    ShieldStatus.DISCONNECTED -> R.string.filter_label_disconnected
+    ShieldStatus.FILTER_FAILED -> R.string.filter_label_failed
+    ShieldStatus.DISABLED -> R.string.filter_label_off
 }
 
 @Composable
-private fun dotColor(phase: BlockerState.Phase): Color = when (phase) {
-    BlockerState.Phase.CONNECTED -> SciFiColors.GoGreen
-    BlockerState.Phase.CONNECTING -> SciFiColors.SolarAmber
-    BlockerState.Phase.FAILED -> colorScheme.error
-    BlockerState.Phase.OFF -> Color(0xFF5A6B7A)
+private fun filterDetail(status: ShieldStatus): String = when (status) {
+    ShieldStatus.VERIFIED -> stringResource(R.string.filter_verified)
+    ShieldStatus.RUNNING_UNVERIFIED -> stringResource(R.string.filter_unverified)
+    ShieldStatus.INITIALIZING -> stringResource(R.string.filter_initializing)
+    ShieldStatus.UNKNOWN -> stringResource(R.string.filter_initializing)
+    ShieldStatus.PERMISSION_MISSING -> stringResource(R.string.filter_permission_missing)
+    ShieldStatus.DISCONNECTED -> stringResource(R.string.filter_disconnected)
+    ShieldStatus.FILTER_FAILED -> stringResource(R.string.filter_failed)
+    ShieldStatus.DISABLED -> stringResource(R.string.filter_off)
+}
+
+@Composable
+private fun dotColor(status: ShieldStatus): Color = when (status) {
+    ShieldStatus.VERIFIED -> SciFiColors.GoGreen
+    ShieldStatus.RUNNING_UNVERIFIED -> SciFiColors.SolarAmber
+    ShieldStatus.INITIALIZING,
+    ShieldStatus.DISCONNECTED,
+    -> SciFiColors.SolarAmber
+
+    ShieldStatus.FILTER_FAILED,
+    ShieldStatus.PERMISSION_MISSING,
+    -> colorScheme.error
+
+    ShieldStatus.DISABLED -> Color(0xFF5A6B7A)
+    ShieldStatus.UNKNOWN -> Color(0xFF5A6B7A)
 }
 

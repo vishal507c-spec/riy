@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.vishal.riy.R
+import com.vishal.riy.blocker.ShieldStatus
 import com.vishal.riy.protection.enforcement.AllowedApp
 import com.vishal.riy.protection.enforcement.AllowedAppCategory
 import com.vishal.riy.protection.policy.ProtectionState
@@ -54,13 +55,74 @@ data class ProtectionStatusPresentation(
 )
 
 /**
- * The single mapping. Precedence is deliberate: an honest warning outranks a
+ * The single mapping. Precedence is deliberate: a broken filter outranks
+ * everything, because an app-restriction story on a device whose filter is not
+ * running is still "not protected". Then an honest warning outranks a
  * reassuring label, an in-flight restoration outranks a resolved one, and an
  * escalated restriction is named differently from an ordinary one — but
  * RESTRICTED and HARDENED share the SAME deadline, so both show the SAME
  * countdown and there is never a second timer on screen.
+ *
+ * The shield states come first on purpose: "You're Protected" must never be
+ * reachable while the network filter is off, disconnected, broken or simply
+ * unverified.
  */
 fun ProtectionUiState.userFacing(): ProtectionStatusPresentation = when {
+
+    shieldStatus == ShieldStatus.FILTER_FAILED -> ProtectionStatusPresentation(
+        titleRes = R.string.status_filter_failed_title,
+        detailRes = R.string.status_filter_failed_detail,
+        icon = Icons.Filled.Warning,
+        showsCountdown = false,
+        activeLineRes = R.string.filter_label_failed,
+        activeDetailRes = R.string.filter_failed,
+    )
+
+    shieldStatus == ShieldStatus.PERMISSION_MISSING -> ProtectionStatusPresentation(
+        titleRes = R.string.status_permission_title,
+        detailRes = R.string.status_permission_detail,
+        icon = Icons.Filled.Warning,
+        showsCountdown = false,
+        activeLineRes = R.string.filter_label_permission_missing,
+        activeDetailRes = R.string.filter_permission_missing,
+    )
+
+    shieldStatus == ShieldStatus.DISCONNECTED -> ProtectionStatusPresentation(
+        titleRes = R.string.status_disconnected_title,
+        detailRes = R.string.status_disconnected_detail,
+        icon = Icons.Filled.Autorenew,
+        showsCountdown = false,
+        activeLineRes = R.string.filter_label_disconnected,
+        activeDetailRes = R.string.filter_disconnected,
+    )
+
+    shieldStatus == ShieldStatus.RUNNING_UNVERIFIED -> ProtectionStatusPresentation(
+        titleRes = R.string.status_unverified_title,
+        detailRes = R.string.status_unverified_detail,
+        icon = Icons.Filled.Warning,
+        showsCountdown = false,
+        activeLineRes = R.string.filter_label_unverified,
+        activeDetailRes = R.string.filter_unverified,
+    )
+
+    shieldStatus == ShieldStatus.INITIALIZING ||
+    shieldStatus == ShieldStatus.UNKNOWN -> ProtectionStatusPresentation(
+        titleRes = R.string.status_starting_title,
+        detailRes = R.string.status_starting_detail,
+        icon = Icons.Filled.Autorenew,
+        showsCountdown = false,
+        activeLineRes = R.string.filter_label_starting,
+        activeDetailRes = R.string.filter_initializing,
+    )
+
+    shieldStatus == ShieldStatus.DISABLED -> ProtectionStatusPresentation(
+        titleRes = R.string.status_off_title,
+        detailRes = R.string.status_off_detail,
+        icon = Icons.Filled.Shield,
+        showsCountdown = false,
+        activeLineRes = R.string.filter_label_off,
+        activeDetailRes = R.string.filter_off,
+    )
 
     enforcementMismatch -> ProtectionStatusPresentation(
         titleRes = R.string.status_mismatch_title,

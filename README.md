@@ -120,6 +120,53 @@ technically valid control point available to a normal SDK-constrained app.
 - SafeSearch enforcement is DNS-based; it cannot control a browser using its
   own encrypted DNS (e.g. Chrome with "secure DNS" pointed elsewhere), although
   such lookups are routed into the filter where possible.
+
+## Adult-site blocking: what is and is not covered
+
+RIY is a **DNS-level** blocker. It can block a domain only when it can read the
+QNAME, i.e. on a plain (or system-resolver) DNS query. Everything below follows
+from that one fact, and the app reports it rather than hiding it.
+
+**Covered**
+
+- Adult domains from a maintained blocklist (StevenBlack hosts, "porn-only",
+  ~77k domains) plus code-level adult-brand/TLD heuristics, matched on the host
+  and every subdomain. Refresh with
+  `powershell -File tools/blocklist/refresh-blocklist.ps1`.
+- Normal Chrome and Incognito **equally** — there is no Incognito-specific code
+  path. Both resolve through the same resolver, so both are filtered or neither
+  is. Chrome's own DNS cache being separate does not change the outcome,
+  because every query is answered by the filter rather than being cached around.
+- Encrypted-DNS endpoints are sinkholed by hostname, and traffic to ~50 known
+  public/DoH/DoT resolver IPs is captured into the tun and dropped, so apps using
+  their own resolver fall back to the filtered system DNS.
+- On a Device Owner device, the `no_config_private_dns` restriction removes the
+  system "Private DNS" (DoT) toggle, which is the only supported Android control
+  for that route.
+
+**Not covered — by design, and shown in the UI**
+
+- **A browser's own "Secure DNS" (DoH).** The QNAME is inside TLS. Blocking it
+  would require TLS interception: a private CA installed on the device and
+  decrypting browsing traffic. RIY deliberately does not do this — it would
+  mean collecting browsing content and would break certificate pinning.
+  No Android API exposes another app's DoH setting, so this cannot be detected,
+  blocked or measured from inside the app. The dashboard therefore shows
+  *"Running — Not Verified"* with an explicit note whenever Device Owner does
+  not close that route.
+- **Search queries.** Google/Bing/DDG results are filtered *server-side* via
+  SafeSearch frontend pinning. The query text itself is HTTPS content and is
+  never read. What DNS filtering does do is block the adult **destination**.
+- **IPv6 resolvers not on the capture list.** Only the listed resolver IPs are
+  routed into the tun; there is no `::/0` default route, because the filter has
+  no TCP/IP stack and would blackhole all IPv6 traffic.
+
+Because of the first point, the app never displays "fully protected" purely
+because the VPN service started. On start it runs an **end-to-end self-test**
+through the real tun: it resolves a canary adult-TLD name (which the matcher
+answers locally, so no real adult site is ever contacted) and expects it to be
+sinkholed, and resolves `example.com` and expects it to still work. Only a
+passing self-test upgrades the dashboard to *"Adult Sites Blocked"*.
 - The lock screen cannot be dismissed, backed out of, or cleared by restarting
   the app or rebooting the device. It is **an in-app lock**: while the lock is
   live the blocking stays ON and riy shows the countdown. Android does not let

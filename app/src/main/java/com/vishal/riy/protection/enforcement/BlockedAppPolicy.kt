@@ -166,10 +166,16 @@ object BlockedAppPolicy {
 
     /**
      * Well-known encrypted-DNS endpoints whose hostnames are sinkholed so apps
-     * using their own DoH/DoT fall back to the filtered system DNS. Numeric-IP
-     * DoH can still bypass a split-tunnel VPN (documented limitation); the
-     * Device Owner user restrictions (DISALLOW_CONFIG_PRIVATE_DNS /
-     * DISALLOW_CONFIG_VPN) are the primary control for that path.
+     * using their own DoH/DoT fall back to the filtered system DNS.
+     *
+     * SCOPE, stated honestly: this removes the *hostname* route only.
+     *  - A DoH client using a numeric IP bypasses it entirely.
+     *  - A per-app DoH client (Chrome "Secure DNS") is invisible to Android and
+     *    cannot be enumerated from here.
+     *  - Only the Device Owner `no_config_private_dns` restriction closes the
+     *    SYSTEM Private DNS route, and only on a managed device.
+     * The UI reports this as "filter running, bypass protection unverified"
+     * rather than claiming the device is fully protected.
      */
     val ENCRYPTED_DNS_BYPASS_HOSTS: Set<String> = setOf(
         "dns.google",
@@ -179,6 +185,16 @@ object BlockedAppPolicy {
         "dns.adguard.com",
         "doh.opendns.com",
         "dns.quad9.net",
+        "dns.quad9.io",
+        "doh.cleanbrowsing.org",
+        "doh.mullvad.net",
+        "doh.dns.sb",
+        "dns.nextdns.io",
+        "controld.com",
+        "doh.dns.sb",
+        "dns.sb",
+        "sdns.cloudflare.com",
+        "encrypted-dns.google",
     )
 
     /** True when [domain] is a bypass-transport hostname (CDN or encrypted DNS). */

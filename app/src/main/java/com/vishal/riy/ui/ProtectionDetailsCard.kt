@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vishal.riy.R
+import com.vishal.riy.blocker.ShieldStatus
 import com.vishal.riy.protection.enforcement.EnforcementStatus
 import com.vishal.riy.protection.ui.ProtectionUiState
 
@@ -70,9 +71,16 @@ fun ProtectionDetailsCard(state: ProtectionUiState) {
             )
             DetailLine(
                 labelRes = R.string.details_network,
-                value = stringResource(R.string.state_active),
-                ok = state.protectionActive,
+                value = networkLine(state),
+                ok = state.filteringVerified,
             )
+            if (state.encryptedDnsBypassPossible) {
+                Text(
+                    text = stringResource(R.string.filter_encrypted_dns_caveat),
+                    style = typography.bodySmall,
+                    color = colorScheme.onSurfaceVariant,
+                )
+            }
             DetailLine(
                 labelRes = R.string.details_integrity,
                 value = stringResource(
@@ -120,4 +128,22 @@ private fun appRestrictionLine(state: ProtectionUiState): String = when {
     state.enforcementStatus == EnforcementStatus.NORMAL ->
         stringResource(R.string.state_active)
     else -> stringResource(R.string.enforcement_pending)
+}
+
+/**
+ * The network line. "Active" is only earned by [ProtectionUiState
+ * .filteringVerified], i.e. by a self-test that actually blocked a canary
+ * domain — a running-but-unverified filter is reported as unverified rather
+ * than green.
+ */
+@Composable
+private fun networkLine(state: ProtectionUiState): String = when (state.shieldStatus) {
+    ShieldStatus.VERIFIED -> stringResource(R.string.state_active)
+    ShieldStatus.RUNNING_UNVERIFIED -> stringResource(R.string.state_unverified)
+    ShieldStatus.INITIALIZING -> stringResource(R.string.state_applying)
+    ShieldStatus.PERMISSION_MISSING -> stringResource(R.string.state_permission_needed)
+    ShieldStatus.DISCONNECTED -> stringResource(R.string.state_disconnected)
+    ShieldStatus.FILTER_FAILED -> stringResource(R.string.state_not_working)
+    ShieldStatus.DISABLED -> stringResource(R.string.state_unavailable)
+    ShieldStatus.UNKNOWN -> stringResource(R.string.state_applying)
 }

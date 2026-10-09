@@ -1,3 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Riy" parent="Theme.Material3.DayNight.NoActionBar" />
+
+    <!--
+        Shared shapes for the native update screens so the XML dialogs match the
+        Compose cockpit: one small circular step badge, one quiet body line.
+    -->
+    <style name="RiyStepBadge">
+        <item name="android:layout_width">26dp</item>
+        <item name="android:layout_height">26dp</item>
+        <item name="android:background">@drawable/bg_riy_badge</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/riy_cyan</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="RiyStepText">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">12dp</item>
+        <item name="android:textColor">@color/riy_text</item>
+        <item name="android:textSize">14sp</item>
+    </style>
 </resources>

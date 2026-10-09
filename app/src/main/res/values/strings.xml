@@ -133,8 +133,84 @@
     <!-- Honest network filter status -->
     <string name="filter_on">Adult sites are blocked system-wide.</string>
     <string name="filter_connecting">Activating the VPN filter…</string>
-    <string name="filter_failed">The filter could not start. Tap Enable Protection to retry.</string>
     <string name="filter_off">No filtering is running right now.</string>
+
+    <!-- Network-filter status. Each state gets its own wording: the app must
+         never show a reassuring "protected" line for a state that is not. -->
+    <string name="filter_label_verified">Adult Sites Blocked</string>
+    <string name="filter_verified">RIY tested the filter and confirmed that adult sites are blocked, while normal websites still open.</string>
+
+    <string name="filter_label_unverified">Running — Not Verified</string>
+    <string name="filter_unverified">The filter is running, but RIY has not been able to confirm the protection. An app that uses its own secure DNS can get around any website filter.</string>
+
+    <string name="filter_label_starting">Starting…</string>
+    <string name="filter_initializing">Loading the blocklist. Nothing is blocked until this finishes.</string>
+
+    <string name="filter_label_permission_missing">Permission Needed</string>
+    <string name="filter_permission_missing">RIY does not have permission to run the filter. Tap Enable Protection and allow the VPN request.</string>
+
+    <string name="filter_label_disconnected">Not Connected</string>
+    <string name="filter_disconnected">Protection is switched on but the filter is not connected right now.</string>
+
+    <string name="filter_label_failed">Filter Not Working</string>
+    <string name="filter_failed">The filter could not start, or it failed its own check. Tap Enable Protection to retry.</string>
+
+    <string name="filter_label_off">Not Enabled</string>
+
+    <!-- ============================ Daily Tracker ============================
+         Deliberately no levels, XP, recovery stages, dopamine percentages or
+         health claims. The tracker reports recorded days and nothing else, and
+         the numbers always come from real persisted data. -->
+    <string name="tracker_entry_title">Open Daily Tracker</string>
+    <string name="tracker_title">RIY SHIELD</string>
+    <string name="tracker_subtitle">Daily Tracker</string>
+
+    <string name="tracker_stat_yes_days">MASTURBATION DAYS</string>
+    <string name="tracker_stat_no_days">NON-MASTURBATION DAYS</string>
+    <string name="tracker_stat_current_streak">CURRENT STREAK</string>
+    <string name="tracker_stat_longest_streak">LONGEST STREAK</string>
+    <string name="tracker_unrecorded_note">%1$d day(s) in this period have no entry. They are not counted as either kind of day.</string>
+
+    <string name="tracker_calendar_header">MONTHLY CALENDAR</string>
+    <string name="tracker_back">Back</string>
+    <string name="tracker_saved">Saved</string>
+    <string name="tracker_legend">Green = NO · Amber = YES · Grey = not recorded or unknown. Tap a date to edit it.</string>
+
+    <string name="tracker_greeting">Good Morning!</string>
+    <string name="tracker_question">Kal masturbation kiya tha?</string>
+    <string name="tracker_date_hint">Date being recorded</string>
+    <string name="tracker_answer_yes">YES</string>
+    <string name="tracker_answer_no">NO</string>
+    <string name="tracker_answer_unknown">NOT SURE</string>
+    <string name="tracker_save_continue">SAVE &amp; CONTINUE</string>
+    <string name="tracker_later">LATER</string>
+    <string name="tracker_delete_record">Delete this entry</string>
+
+    <!-- Privacy: the morning notification carries NO date, answer or streak. -->
+    <string name="tracker_notification_channel">Daily check-in</string>
+    <string name="tracker_notification_channel_desc">Reminds you that the daily entry is pending.</string>
+    <string name="tracker_notification_title">RIY Shield</string>
+    <string name="tracker_notification_text">RIY Shield — Daily check-in pending.</string>
+
+    <string name="state_unverified">Running — not verified</string>
+    <!-- Headline titles. Each of these replaces "You're Protected", which must
+         never be shown while the network filter is off, broken or unverified. -->
+    <string name="status_filter_failed_title">Filter Not Working</string>
+    <string name="status_filter_failed_detail">RIY could not run or verify its filter, so websites are not being blocked right now.</string>
+    <string name="status_permission_title">Permission Needed</string>
+    <string name="status_permission_detail">RIY needs your permission to run the network filter.</string>
+    <string name="status_disconnected_title">Not Connected</string>
+    <string name="status_disconnected_detail">Protection is switched on, but the filter is not connected.</string>
+    <string name="status_unverified_title">Running — Not Verified</string>
+    <string name="status_unverified_detail">RIY has not confirmed that websites are being blocked. Do not rely on this device staying protected.</string>
+    <string name="status_starting_title">Starting…</string>
+    <string name="status_starting_detail">Loading the blocklist. Nothing is blocked until this finishes.</string>
+    <string name="status_off_title">Protection Is Off</string>
+    <string name="status_off_detail">Turn on protection to block adult websites.</string>
+    <string name="state_permission_needed">Permission needed</string>
+    <string name="state_disconnected">Not connected</string>
+    <string name="state_not_working">Not working</string>
+    <string name="filter_encrypted_dns_caveat">Note: apps that use their own secure DNS (encrypted DNS) can get around any website filter. RIY cannot read encrypted lookups.</string>
 
     <!-- Auto-update (GitHub Release) dialog -->
     <string name="update_title">New Update Available</string>
@@ -148,6 +224,60 @@
     <string name="update_install_permission_title">Permission needed</string>
     <string name="update_install_permission_message">Allow installing apps from this source to complete the update. After granting the permission, tap “Update Now” again.</string>
     <string name="update_retry">Retry</string>
+
+    <!--
+        Update install routing.
+
+        Plain human language. No developer terminology, no policy jargon and no
+        device-admin internals are ever shown to the user.
+    -->
+    <string name="update_blocker_none">Direct installation is available.</string>
+    <string name="update_blocker_policy">This device does not allow this app to install updates directly.</string>
+    <string name="update_blocker_not_granted">Installation permission could not be enabled on this device.</string>
+
+    <!-- APK verification: why an update will not be attempted -->
+    <string name="update_reject_missing">The downloaded update file is missing. Check your connection and try again.</string>
+    <string name="update_reject_corrupt">The downloaded update file could not be read, so it was not installed. Try again.</string>
+    <string name="update_reject_wrong_package">This file is not a Riy update, so it was not installed.</string>
+    <string name="update_reject_signature">Update cannot continue because this APK is signed with a different certificate.</string>
+    <string name="update_reject_same_version">This version is already installed. Nothing to update.</string>
+    <string name="update_reject_downgrade">This APK is an older version than the one installed, so it was not installed.</string>
+    <string name="update_ready_usb">The update is ready.</string>
+    <string name="update_restricted_title">Installation restricted</string>
+    <string name="update_restricted_usb">USB update</string>
+
+    <!-- USB / ADB development update screen -->
+    <string name="usb_eyebrow">USB UPDATE</string>
+    <string name="usb_version_line">Riy %1$s</string>
+    <string name="usb_subtitle">Ready for development update</string>
+
+    <string name="usb_status_waiting">USB not connected</string>
+    <string name="usb_status_ready">Ready to update</string>
+    <string name="usb_status_success">Update successful</string>
+    <string name="usb_status_rejected">Installation blocked</string>
+    <string name="usb_status_current">Already up to date</string>
+    <string name="usb_status_apk_missing">Update file not available</string>
+
+    <string name="usb_detail_not_connected">Connect your phone to your development computer and update safely using ADB.</string>
+    <string name="usb_detail_connected">A USB device is attached. Finish the update from your computer using the command below.</string>
+    <string name="usb_detail_success">Riy was updated. Everything you had set up is still here.</string>
+    <string name="usb_detail_current">This version is already installed, so nothing needs to be done.</string>
+    <string name="usb_detail_apk_missing">Download the update again to continue.</string>
+
+    <string name="usb_step_1">Enable USB debugging</string>
+    <string name="usb_step_2">Connect to your computer</string>
+    <string name="usb_step_3">Install the generated APK</string>
+    <string name="usb_step_4">Re-open Riy</string>
+
+    <string name="usb_command_label">COMMAND</string>
+    <string name="usb_hint_exported">This phone already has the update file at %1$s. Pull it, or download it from the release page.</string>
+    <string name="usb_hint_pc_download">Download %1$s from the release page on your computer, then run the command above.</string>
+
+    <string name="usb_action_copy_command">Copy ADB command</string>
+    <string name="usb_action_check_connection">Check USB connection</string>
+    <string name="usb_action_retry">Retry</string>
+    <string name="usb_command_copied">Command copied</string>
+    <string name="usb_checked_connection">Connection checked</string>
 
     <!--
         WhatsApp Status / Updates blocker (on-device UI guard).

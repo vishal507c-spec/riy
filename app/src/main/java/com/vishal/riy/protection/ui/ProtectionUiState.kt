@@ -1,5 +1,6 @@
 package com.vishal.riy.protection.ui
 
+import com.vishal.riy.blocker.ShieldStatus
 import com.vishal.riy.protection.enforcement.AllowedApp
 import com.vishal.riy.protection.enforcement.EnforcementStatus
 import com.vishal.riy.protection.events.ProtectionLogEvent
@@ -59,7 +60,27 @@ data class ProtectionUiState(
 
     val restrictedReason: String? = null,
 
+    /**
+     * The network filter's real status. Carried through so every surface
+     * (dashboard, details card, lock screen) reports the SAME evidence instead
+     * of each re-deriving "the VPN started, so we must be protected".
+     */
+    val shieldStatus: ShieldStatus = ShieldStatus.DISABLED,
+
+    /** True when an encrypted-DNS route may still bypass the filter. */
+    val encryptedDnsBypassPossible: Boolean = true,
+
 ) {
+
+    /**
+     * True when the filter has been PROVEN to block, not merely started.
+     *
+     * This is deliberately stricter than [protectionActive]: a running filter
+     * that has not passed its self-test is protecting nothing that has been
+     * demonstrated, and the UI must not paint a verified state off it.
+     */
+    val filteringVerified: Boolean
+        get() = shieldStatus == ShieldStatus.VERIFIED
 
     /** True when the device is under a live restriction. */
     val isRestricted: Boolean
@@ -122,6 +143,10 @@ data class ProtectionUiState(
             blockedAppCount = 0,
             recentEvents = emptyList(),
             restrictedReason = null,
+            // The honest pre-load answer is "not known yet" — never a
+            // reassuring default the UI could paint before the backend reads.
+            shieldStatus = ShieldStatus.UNKNOWN,
+            encryptedDnsBypassPossible = true,
         )
     }
 }

@@ -20,6 +20,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.DataInputStream
 import java.io.FileInputStream
@@ -194,21 +195,15 @@ class BlockerVpnService : VpnService() {
 
     private fun startFiltering(allowRetry: Boolean = false) {
         if (running.get()) {
-            BlockerState.update(BlockerState.Phase.CONNECTED)
+            // Already live: keep the evidence we already have. Re-announcing
+            // CONNECTED here would wipe the verified/unverified distinction.
+            Log.i(TAG, "already running; keeping phase=${BlockerState.current().phase}")
             return
         }
         // Fresh (user-initiated) starts reset the retry counter; retries must
         // keep counting up or they would loop forever.
         if (!allowRetry) retryAttempt = 0
         BlockerState.update(BlockerState.Phase.CONNECTING)
-
-        val blocklist = try {
-            loadBlocklist()
-        } catch (e: Exception) {
-            Log.e(TAG, "blocklist load failed", e)
-            fail("internal error: blocklist")
-            return
-        }
 
         val fd = try {
             establishVpn()
@@ -234,21 +229,101 @@ class BlockerVpnService : VpnService() {
                 return
             }
             Log.e(TAG, "VPN establish failed (permission revoked or another VPN active)")
-            fail("VPN permission missing or another VPN is active")
+            fail(
+                "VPN permission missing or another VPN is active",
+                BlockerState.FailureKind.VPN_PERMISSION_MISSING,
+            )
             return
         }
 
         running.set(true)
         vpnInterface = fd
         scope = newScope()
-        // Prime the SafeSearch VIP cache early (fire-and-forget, never blocks).
-        scope.launch { runCatching { safeSearchEnforcer.refreshAll() } }
+        // The tun is up but the filter cannot answer anything yet: the blocklist
+        // is large enough that parsing it must never happen on the main thread,
+        // and until it is loaded the device is NOT protected. Reporting
+        // CONNECTED here is exactly the "protected because the service started"
+        // lie this app must not tell.
+        BlockerState.update(BlockerState.Phase.INITIALIZING)
+        applyEncryptedDnsPolicy()
         worker = thread(name = "riy-dns-filter", isDaemon = true) {
+            val blocklist = try {
+                loadBlocklist()
+            } catch (e: Exception) {
+                Log.e(TAG, "blocklist load failed", e)
+                fail("filter initialization failed", BlockerState.FailureKind.FILTER_INIT_FAILED)
+                return@thread
+            }
+            if (!running.get()) return@thread // stopped while we were loading
+            Log.i(TAG, "protection active (${blocklist.ruleCount} blocklist rules, SafeSearch enforced)")
+            BlockerState.update(BlockerState.Phase.CONNECTED, ruleCount = blocklist.ruleCount)
+            // Prime the SafeSearch VIP cache and verify ourselves in the
+            // background: the filter is live but NOT yet proven, and the UI must
+            // say so until the self-test comes back.
+            publishFilterState(blocklist.ruleCount)
+            scope.launch { runCatching { safeSearchEnforcer.refreshAll() } }
+            runSelfTest(blocklist.ruleCount)
             runFilterLoop(fd, blocklist)
         }
-        BlockerState.update(BlockerState.Phase.CONNECTED)
-        Log.i(TAG, "protection active (${blocklist.ruleCount} blocklist rules, SafeSearch enforced)")
     }
+
+    /**
+     * Records what the filter has actually proven so far, never more than that.
+     * Kept in one place so no code path can publish a reassuring state.
+     */
+    /**
+     * Runs the end-to-end self-test and publishes ONLY what it measured. A
+     * self-test that cannot reach the filter downgrades the state rather than
+     * leaving a stale "verified" claim on screen.
+     */
+    private fun runSelfTest(ruleCount: Int) {
+        scope.launch {
+            val report = withContext(Dispatchers.IO) {
+                FilterSelfTest(VPN_DNS_ADDRESS).run(ruleCount)
+            }
+            if (!running.get()) return@launch
+            publishFilterState(ruleCount, report)
+        }
+    }
+
+    /**
+     * Records what the filter has actually proven so far, never more than that.
+     * Single publish point so no code path can show a reassuring state.
+     */
+    private fun publishFilterState(ruleCount: Int, report: SelfTestReport? = null) {
+        val phase = BlockerState.current().phase
+        val health = report?.health() ?: BlockerState.healthFor(phase)
+        val privateDnsConfigured = EncryptedDnsInspector.isPrivateDnsConfigured(this)
+        val privateDnsRestricted = isPrivateDnsRestricted()
+        BlockerState.update(
+            phase = phase,
+            health = health,
+            ruleCount = ruleCount,
+            selfTestSummary = report?.summary(),
+            privateDnsConfigured = privateDnsConfigured,
+            privateDnsRestricted = privateDnsRestricted,
+        )
+        val exposure = EncryptedDnsExposure(privateDnsConfigured, privateDnsRestricted, report?.verified == true)
+        Log.i(
+            TAG,
+            "filter state: rules=$ruleCount health=$health bypassPossible=${exposure.bypassPossible}",
+        )
+    }
+
+    /**
+     * Applies the one supported platform control that closes the system-level
+     * encrypted-DNS route (Android "Private DNS" / DoT): a Device Owner user
+     * restriction. Deliberately NOT applied without Device Owner, and fully
+     * reversible. A per-app DoH client inside Chrome stays invisible to every
+     * Android API — that limitation is reported, never papered over.
+     */
+    private fun applyEncryptedDnsPolicy() {
+        val applied = EncryptedDnsPolicy.apply(this)
+        Log.i(TAG, "private DNS restriction applied=$applied")
+    }
+
+    /** Reads back whether the private-DNS restriction is genuinely in force. */
+    private fun isPrivateDnsRestricted(): Boolean = EncryptedDnsPolicy.isRestricted(this)
 
     private fun stopFiltering() {
         if (running.getAndSet(false)) {
@@ -266,12 +341,15 @@ class BlockerVpnService : VpnService() {
         stopSelf()
     }
 
-    private fun fail(reason: String) {
+    private fun fail(
+        reason: String,
+        kind: BlockerState.FailureKind = BlockerState.FailureKind.VPN_DISCONNECTED,
+    ) {
         mainHandler.removeCallbacks(retryRunnable)
         // The user's ON choice is PRESERVED: the FAILED phase itself signals
         // "not protected" honestly, and the app self-heals on next open so a
         // transient boot race or another VPN letting go can recover.
-        BlockerState.update(BlockerState.Phase.FAILED, reason)
+        BlockerState.update(BlockerState.Phase.FAILED, reason, kind)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -361,7 +439,13 @@ class BlockerVpnService : VpnService() {
         }
         if (blocklist.contains(question.name)) {
             val response = DnsProtocol.buildBlockedResponse(dns) ?: return
-            recordPornDetection(question.name)
+            // The self-test canary is RIY's OWN probe. It is still blocked (that
+            // is what proves enforcement), but it must never be handed to the
+            // detection pipeline: arming a protection event from the app's own
+            // health check would be a false positive manufactured by us.
+            if (!SelfTestCanaries.isSelfTestQuery(question.name)) {
+                recordPornDetection(question.name)
+            }
             writeReply(output, IpPacket.buildReply(parsed, response))
         } else {
             // SafeSearch pinning answers locally; everything else is forwarded.
@@ -572,15 +656,34 @@ class BlockerVpnService : VpnService() {
 
         /**
          * Public resolver IPs routed into the tun so that (a) apps hardcoding
-         * a resolver are still filtered and (b) DoH/DoT to these providers is
-         * dropped, forcing fallback to the filtered system DNS.
+         * a resolver are still filtered and (b) encrypted-DNS traffic to these
+         * providers (DoT/853, DoH/443, HTTPS/443) is DROPPED, forcing those
+         * apps back onto the filtered system DNS.
+         *
+         * This is best-effort by nature: it is an IP list, so a DoH client
+         * pointed at a provider that is not listed here is not captured. That
+         * gap is exactly why the dashboard reports "filter running, bypass
+         * protection unverified" instead of claiming full protection — see
+         * [EncryptedDnsExposure]. The list is deliberately wide because the cost
+         * of a false capture is only that those specific IPs are unreachable
+         * while protection is on.
          */
         private val INTERCEPTED_RESOLVERS_V4 = listOf(
             "8.8.8.8", "8.8.4.4",               // Google
             "1.1.1.1", "1.0.0.1",               // Cloudflare
             "9.9.9.9", "149.112.112.112",       // Quad9
+            "9.9.9.10",                         // Quad9 (unfiltered)
             "208.67.222.222", "208.67.220.220", // OpenDNS
+            "208.67.222.238",                   // OpenDNS (FamilyShield)
             "94.140.14.14", "94.140.15.15",     // AdGuard
+            "94.140.14.15",                     // AdGuard
+            "185.228.168.9", "185.228.169.9",   // CleanBrowsing
+            "185.228.168.10", "185.228.169.10", // CleanBrowsing (security)
+            "45.90.28.0", "45.90.30.0",         // NextDNS (common endpoints)
+            "103.86.96.100",                    // NextDNS
+            "76.76.2.0",                        // ControlD
+            "194.242.2.2",                      // Mullvad
+            "185.222.222.222", "185.222.223.223", // DNS.SB
             "64.6.64.6", "64.6.65.6",           // Verisign
             "77.88.8.8", "77.88.8.1",           // Yandex
             "114.114.114.114", "114.114.115.115",
@@ -598,8 +701,11 @@ class BlockerVpnService : VpnService() {
             "2001:4860:4860::8888", "2001:4860:4860::8844", // Google
             "2606:4700:4700::1111", "2606:4700:4700::1001", // Cloudflare
             "2620:fe::fe", "2620:fe::9",                    // Quad9
+            "2620:fe::10",                                  // Quad9 (unfiltered)
             "2620:119:35::35", "2620:119:53::53",           // OpenDNS
             "2a10:50c0::ad1:ff", "2a10:50c0::ad2:ff",       // AdGuard
+            "2a07:a8c0::12:3456",                           // NextDNS
+            "2606:1a40::12:3456",                           // NextDNS
         )
 
         /**

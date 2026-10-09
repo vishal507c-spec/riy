@@ -1,7 +1,9 @@
 package com.vishal.riy.update
 
+import android.content.Context
+import android.os.Build
 import android.os.Bundle
-import android.view.LayoutInflater
+import android.util.Log
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -18,18 +20,22 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Native "New Update Available" dialog.
+ * Native "New Update Available" dialog, now with a REAL routing decision.
  *
- *  - [Later]  -> dismisses; the app stays usable and the check happens again at a
- *                future lifecycle event (throttled).
- *  - [Update Now] -> downloads the private APK via an app-controlled authenticated
- *                HTTPS request to the GitHub Releases Assets API (no DownloadManager),
- *                shows real progress, verifies the APK, then hands it to the system
- *                installer. Failures show a clear message and keep the app usable.
+ * The flow, in full:
  *
- * The download runs in [lifecycleScope] on [Dispatchers.IO]; it is cancelled
- * automatically (and its temp file cleaned up) if the Fragment is destroyed, so a
- * detached Fragment is never touched and no UI update occurs on a stale Fragment.
+ *   Update Now
+ *     → probe the real install environment
+ *        → normal installer available      → download, verify, `PackageInstaller` session
+ *        → unknown-sources screen works     → offer it ONCE (never again)
+ *        → policy owns it / screen useless  → download, verify, stage, USB UPDATE screen
+ *
+ * `PackageInstaller.STATUS_FAILURE_BLOCKED` (the "Blocked by your IT admin"
+ * result) routes into the same USB screen, so there is no code path that can send
+ * the user back to a disabled switch. That is the fix for the reported loop.
+ *
+ * The download still runs in [lifecycleScope] on [Dispatchers.IO] and is
+ * cancelled automatically when the Fragment is destroyed, exactly as before.
  */
 class UpdateDialogFragment : DialogFragment() {
 
@@ -37,14 +43,12 @@ class UpdateDialogFragment : DialogFragment() {
     private var installedVersionCode: Long = 0L
 
     private var dialogView: View? = null
-    private var installAfterPermission = false
 
     private val installPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            // After granting "install unknown apps" the user taps "Update Now" again
-            // to start the download; there is no verified APK here yet, so there is
-            // nothing to install. Just clear the retry flag (lifecycle-safe).
-            if (installAfterPermission) installAfterPermission = false
+            // The grant screen closed. Whether it helped is decided by a fresh
+            // probe on the next tap; the "prompted" flag is already set, so an
+            // ineffective prompt can never come back around.
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,11 +57,11 @@ class UpdateDialogFragment : DialogFragment() {
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): AlertDialog {
-        @Suppress("UNCHECKED_CAST")
-        info = requireArguments().getSerializable(ARG_INFO) as ReleaseInfo
+        info = requireArguments().releaseInfo()
+            ?: throw IllegalStateException("UpdateDialogFragment requires release metadata")
         installedVersionCode = requireArguments().getLong(ARG_INSTALLED_VERSION_CODE)
 
-        val view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_update, null, false)
+        val view = layoutInflater.inflate(R.layout.dialog_update, null, false)
         dialogView = view
         view.findViewById<TextView>(R.id.updateMessage).text =
             getString(R.string.update_message, currentVersionName(), info.versionName)
@@ -71,7 +75,6 @@ class UpdateDialogFragment : DialogFragment() {
         // Wire "Update Now" manually so it does NOT auto-dismiss the dialog: the
         // default AlertDialog button auto-dismisses, which destroys this Fragment
         // and cancels its lifecycleScope (killing the app-controlled HTTPS download).
-        // The dialog is dismissed only through the success/failure flow.
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener { onUpdateNow() }
         }
@@ -85,38 +88,105 @@ class UpdateDialogFragment : DialogFragment() {
         "?"
     }
 
+    /**
+     * The whole routing decision happens BEFORE any download, so a device that
+     * cannot install directly is told so immediately instead of after a 14 MB
+     * download that ends at a dead settings screen.
+     */
     private fun onUpdateNow() {
-        if (!UpdateInstaller.canRequestInstalls(requireContext())) {
-            installAfterPermission = true
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle(R.string.update_install_permission_title)
-                .setMessage(R.string.update_install_permission_message)
-                .setPositiveButton(android.R.string.ok) { _, _ -> onPermissionOk() }
-                .setNegativeButton(R.string.update_action_later, null)
-                .show()
-            return
+        val ctx = context ?: return
+        val prefs = UpdatePreferences(ctx)
+        val prompted = prefs.hasPromptedForInstallGrant()
+
+        // If we are legitimately Device/Profile Owner, give the platform's own
+        // managed flow a chance first (it lifts OUR restriction, nothing else).
+        val blocked = prefs.isInstallBlockedObserved()
+        val afterExemption = if (prefs.isDirectInstallRefused()) {
+            InstallEnvironmentProbe.probe(ctx, prompted, blocked)
+        } else {
+            InstallEnvironmentProbe.allowOwnUpdateExemption(ctx, prompted, blocked)
         }
-        startDownload()
+
+        when (val route = InstallRouteDecider.decide(afterExemption)) {
+            is UpdateRoute.SystemInstaller -> {
+                Log.i("RiyUpdate", "update route=system reason=${route.reason}")
+                startDownload()
+            }
+
+            UpdateRoute.UserGrantSettings -> {
+                Log.i("RiyUpdate", "update route=user_grant (offered once)")
+                showGrantDialogOnce(prefs)
+            }
+
+            is UpdateRoute.UsbAdb -> {
+                // Remembered, so no future tap re-explores the system installer.
+                prefs.markDirectInstallRefused()
+                Log.i("RiyUpdate", "update route=usb blocker=${route.blocker}")
+                showRestrictedIntro(ctx, route) { startDownload(forUsb = true) }
+            }
+        }
+    }
+
+    private fun showGrantDialogOnce(prefs: UpdatePreferences) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.update_install_permission_title)
+            .setMessage(R.string.update_install_permission_message)
+            .setPositiveButton(android.R.string.ok) { _, _ -> openGrantSettings(prefs) }
+            .setNegativeButton(R.string.update_action_later, null)
+            .show()
     }
 
     /**
-     * Opens the "install unknown apps" settings screen. Lifecycle-safe: if this
-     * Fragment is no longer attached there is no valid Activity to launch the
-     * settings from, so the tap is ignored instead of calling requireActivity()
-     * on a stale Fragment.
+     * Explains the restriction BEFORE downloading anything, then lets the user
+     * choose USB explicitly. Retry re-probes the live environment; USB starts the
+     * staged download. Neither button returns to the unusable settings switch.
      */
-    private fun onPermissionOk() {
+    private fun showRestrictedIntro(
+        ctx: Context,
+        route: UpdateRoute.UsbAdb,
+        onUsbUpdate: () -> Unit,
+    ) {
+        val message = getString(route.blockerMessageRes()) +
+            "\n\n" + getString(R.string.usb_detail_not_connected)
+        val intro = MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.update_restricted_title)
+            .setMessage(message)
+            .setPositiveButton(R.string.update_restricted_usb, null)
+            .setNeutralButton(R.string.usb_action_retry, null)
+            .setNegativeButton(R.string.update_action_later, null)
+            .create()
+        intro.setOnShowListener {
+            intro.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+                intro.dismiss()
+                onUsbUpdate()
+            }
+            intro.getButton(AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener {
+                intro.dismiss()
+                onUpdateNow()
+            }
+        }
+        intro.show()
+    }
+
+    /**
+     * Opens the unknown-sources screen, recording the attempt FIRST. From now on
+     * the app will never send the user here a second time; if the switch turns out
+     * to be ineffective, the next tap goes to the USB/ADB path.
+     */
+    private fun openGrantSettings(prefs: UpdatePreferences) {
         if (!isAdded) return
+        prefs.markPromptedForInstallGrant()
         installPermissionLauncher.launch(UpdateInstaller.installPermissionIntent(requireActivity()))
     }
 
     // ---------------------------------------------------------------- download
 
-    private fun startDownload() {
+    private fun startDownload(forUsb: Boolean = false) {
         val ctx = context ?: return // only proceed while attached
         showProgress(getString(R.string.update_downloading, 0), 0)
         lifecycleScope.launch(Dispatchers.IO) {
             try {
+                val installed = InstallEnvironmentProbe.installedApkFacts(ctx)
                 val temp = UpdateInstaller.downloadToTemp(ctx, info) { downloaded, total ->
                     val pct = if (total > 0L) ((downloaded * 100) / total).toInt().coerceIn(0, 100) else 0
                     withContext(Dispatchers.Main) {
@@ -124,19 +194,38 @@ class UpdateDialogFragment : DialogFragment() {
                     }
                 }
 
-                if (!UpdateInstaller.verifyApk(ctx, temp, installedVersionCode)) {
-                    temp.delete()
-                    withContext(Dispatchers.Main) {
-                        if (isAdded) showFailure(getString(R.string.update_verification_failed))
+                // Full pre-flight: package, version AND signing certificate, before
+                // Android or a PC is ever asked to install anything.
+                val candidate = InstallEnvironmentProbe.candidateApkFacts(ctx, temp)
+                val assessment = ApkCompatibility.assess(installed, candidate, UpdateInstaller.apkFileName(info.versionName))
+
+                when (assessment.disposition) {
+                    ApkDisposition.REJECTED -> {
+                        temp.delete()
+                        withContext(Dispatchers.Main) {
+                            if (isAdded) showFailure(getString(assessment.messageRes))
+                        }
+                        return@launch
                     }
-                    return@launch
+
+                    ApkDisposition.ALREADY_CURRENT -> {
+                        temp.delete()
+                        withContext(Dispatchers.Main) {
+                            if (isAdded) {
+                                showFailure(getString(R.string.update_reject_same_version))
+                            }
+                        }
+                        return@launch
+                    }
+
+                    ApkDisposition.INSTALLABLE -> Unit
                 }
 
                 val final = UpdateInstaller.commitApk(temp, UpdateInstaller.apkFile(ctx, info))
                 withContext(Dispatchers.Main) {
                     if (!isAdded) return@withContext
                     showProgress(getString(R.string.update_installing), 100)
-                    startInstallation(final)
+                    if (forUsb) openUsbUpdate(final, assessment) else installWithSystemInstaller(final)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -148,23 +237,104 @@ class UpdateDialogFragment : DialogFragment() {
         }
     }
 
-    private fun startInstallation(apkFile: File) {
-        val ctx = context ?: return // detached -> never touch a stale context
-        if (!UpdateInstaller.verifyApk(ctx, apkFile, installedVersionCode)) {
-            showFailure(getString(R.string.update_verification_failed))
-            return
-        }
+    /**
+     * PATH A — the normal Android installer, via a real `PackageInstaller`
+     * session so success / cancel / policy-block / failure are all reported.
+     */
+    private fun installWithSystemInstaller(apkFile: File) {
+        val ctx = context ?: return
         dismissProgress()
         dismiss()
-        // Self-update exemption FIRST: our own Device Owner hardening blocks
-        // unknown-source installs while protection is active (system shows
-        // "Blocked by your IT admin"), and a per-app grant cannot override a
-        // Device Owner restriction — so lift it for this verified update.
-        // Reconciliation re-raises it automatically afterwards.
-        UpdateInstaller.allowSelfUpdateInstall(ctx)
-        // Android verifies the APK signature against the installed app here;
-        // a mismatch is rejected by the OS.
-        ctx.startActivity(UpdateInstaller.buildInstallIntent(ctx, apkFile))
+        val started = PackageInstallerLauncher.install(ctx, apkFile) { outcome ->
+            activity?.runOnUiThread { handleInstallOutcome(outcome) }
+        }
+        if (!started) {
+            // Session creation itself failed — fall through to USB mode rather
+            // than leaving the user with nothing to do.
+            openUsbUpdate(
+                apkFile,
+                ApkCompatibility.assess(
+                    InstallEnvironmentProbe.installedApkFacts(ctx),
+                    InstallEnvironmentProbe.candidateApkFacts(ctx, apkFile),
+                    UpdateInstaller.apkFileName(info.versionName),
+                ),
+            )
+        }
+    }
+
+    /**
+     * Handles the platform's answer.
+     *
+     * `BlockedByPolicy` is the exact "Blocked by your IT admin" case: instead of
+     * re-opening the dead settings switch, remember the refusal and offer USB.
+     */
+    private fun handleInstallOutcome(outcome: PackageInstallerLauncher.Outcome) {
+        val ctx = context ?: activity?.applicationContext ?: return
+        val prefs = UpdatePreferences(ctx)
+        when (outcome) {
+            is PackageInstallerLauncher.Outcome.Success -> {
+                // Nothing to do: the new version is live. Protection self-heals on
+                // its own at the next foreground reconciliation.
+            }
+
+            PackageInstallerLauncher.Outcome.Cancelled -> Unit // user chose not to
+
+            PackageInstallerLauncher.Outcome.BlockedByPolicy -> {
+                // The platform told us an administrator owns this. Persist that
+                // answer so no future tap ever re-opens the dead settings switch.
+                prefs.markDirectInstallRefused()
+                prefs.markInstallBlockedObserved()
+                val apk = UpdateInstaller.apkFile(ctx, info)
+                if (apk.exists()) {
+                    openUsbUpdate(
+                        apk,
+                        ApkCompatibility.assess(
+                            InstallEnvironmentProbe.installedApkFacts(ctx),
+                            InstallEnvironmentProbe.candidateApkFacts(ctx, apk),
+                            UpdateInstaller.apkFileName(info.versionName),
+                        ),
+                    )
+                }
+            }
+
+            is PackageInstallerLauncher.Outcome.Failed -> {
+                // Only an attached Activity can host a window. An application
+                // context would crash here after the installer returns.
+                val host = activity ?: return
+                MaterialAlertDialogBuilder(host)
+                    .setTitle(R.string.update_title)
+                    .setMessage(R.string.update_failed)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+            }
+        }
+    }
+
+    /**
+     * PATH B — USB/ADB. Stage the verified APK so a development PC can reach it,
+     * then show the polished USB screen. Never opens a settings switch.
+     */
+    private fun openUsbUpdate(apkFile: File, assessment: ApkAssessment) {
+        val ctx = context ?: return
+        dismissProgress()
+        dismiss()
+        val staging = UsbUpdateController.stageForPc(ctx, apkFile, info)
+        UsbUpdateFragment.newInstance(
+            info = info,
+            versionName = info.versionName,
+            versionCode = info.versionCode,
+            installedVersionCode = installedVersionCode,
+            apkFileName = UpdateInstaller.apkFileName(info.versionName),
+            staging = when (staging) {
+                is UsbUpdateController.Staging.Exported -> UsbUpdateController.STAGING_EXPORTED
+                UsbUpdateController.Staging.NeedsPcDownload -> UsbUpdateController.STAGING_PC_DOWNLOAD
+                is UsbUpdateController.Staging.Failed -> UsbUpdateController.STAGING_FAILED
+            },
+            exportedName = (staging as? UsbUpdateController.Staging.Exported)?.displayName,
+            assessmentDisposition = assessment.disposition.name,
+            adbCommand = assessment.adbCommand,
+            messageRes = assessment.messageRes,
+        ).show(parentFragmentManager, UsbUpdateFragment.TAG)
     }
 
     private fun showFailure(message: String) {
@@ -208,6 +378,14 @@ class UpdateDialogFragment : DialogFragment() {
         dialogView = null
         super.onDestroy()
     }
+
+    private fun Bundle.releaseInfo(): ReleaseInfo? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getSerializable(ARG_INFO, ReleaseInfo::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            getSerializable(ARG_INFO) as? ReleaseInfo
+        }
 
     companion object {
         private const val ARG_INFO = "release_info"

@@ -72,12 +72,40 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            Daily Tracker morning reminder.
+
+            Supported mechanisms only: a single AlarmManager wake-up that posts
+            one privacy-safe notification ("RIY Shield — Daily check-in
+            pending.") which opens MainActivity. It does NOT use a full-screen
+            intent, does NOT launch an activity from the background, does NOT
+            use an AccessibilityService and never touches device unlock. It also
+            deliberately avoids exact alarms, so RIY needs no
+            SCHEDULE_EXACT_ALARM/USE_EXACT_ALARM permission.
+
+            The alarm is one-shot and re-armed here on each fire; BOOT_COMPLETED
+            and the timezone/time-change broadcasts re-arm it too, so it follows
+            the user's LOCAL wall-clock time across DST and reboots.
+        -->
+        <receiver
+            android:name=".tracker.TrackerReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.vishal.riy.tracker.MORNING_CHECK_IN" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- DNS-filtering VPN service. Only the system (which holds
              BIND_VPN_SERVICE) may bind it. The android.net.VpnService action

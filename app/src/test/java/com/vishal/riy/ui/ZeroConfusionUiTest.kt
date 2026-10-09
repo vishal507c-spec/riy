@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
 import com.vishal.riy.R
+import com.vishal.riy.blocker.ShieldStatus
 import com.vishal.riy.protection.enforcement.AllowedApp
 import com.vishal.riy.protection.enforcement.AllowedAppCategory
 import com.vishal.riy.protection.enforcement.EnforcementStatus
@@ -21,7 +22,7 @@ import org.junit.Test
 /**
  * The zero-confusion mapping: the authoritative backend state must reach the
  * user as plain human language, and the developer terminology must never be the
- * thing shown. These assert the mapping as a pure function of the state — no
+ * thing shown. These assert the mapping as a pure function of the state â€” no
  * Compose runtime needed, because [userFacing] holds no lifecycle of its own.
  *
  * This is also the screen-level half of the "UI never exposes sensitive raw
@@ -151,6 +152,61 @@ class ZeroConfusionUiTest {
         assertFalse(AllowedAppCategory.SYSTEM_ESSENTIAL.isShownAsAvailable)
     }
 
+    // ------------------------------------------------ shield status honesty
+
+    /**
+     * Regression: the screen used to read "You're Protected" whenever the VPN
+     * service had started. Each broken/unverified shield state must now have its
+     * own headline instead of inheriting the reassuring one.
+     */
+    @Test
+    fun `a broken filter never renders You're Protected`() {
+        listOf(
+            ShieldStatus.FILTER_FAILED,
+            ShieldStatus.PERMISSION_MISSING,
+            ShieldStatus.DISCONNECTED,
+            ShieldStatus.RUNNING_UNVERIFIED,
+            ShieldStatus.INITIALIZING,
+            ShieldStatus.DISABLED,
+            ShieldStatus.UNKNOWN,
+        ).forEach { status ->
+            val presentation = normal().copy(shieldStatus = status).userFacing()
+            assertNotEquals(
+                "shield state $status must not claim full protection",
+                R.string.status_protected_title,
+                presentation.titleRes,
+            )
+        }
+    }
+
+    @Test
+    fun `a running unverified filter warns instead of reassuring`() {
+        val presentation = normal().copy(
+            shieldStatus = ShieldStatus.RUNNING_UNVERIFIED,
+            encryptedDnsBypassPossible = true,
+        ).userFacing()
+
+        assertEquals(R.string.status_unverified_title, presentation.titleRes)
+        assertEquals(Icons.Filled.Warning, presentation.icon)
+    }
+
+    @Test
+    fun `only a verified filter may reach the protected headline`() {
+        listOf(ShieldStatus.VERIFIED).forEach { status ->
+            assertEquals(
+                R.string.status_protected_title,
+                normal().copy(shieldStatus = status).userFacing().titleRes,
+            )
+        }
+    }
+
+    @Test
+    fun `the loading state makes no protection claim at all`() {
+        // LOADING must not paint green before the backend has been read.
+        val presentation = ProtectionUiState.LOADING.userFacing()
+        assertNotEquals(R.string.status_protected_title, presentation.titleRes)
+    }
+
     // ------------------------------------------------------------- helpers
 
     private fun normal() = ProtectionUiState(
@@ -160,6 +216,10 @@ class ZeroConfusionUiTest {
         uninstallProtectionActive = true,
         integrityVerified = true,
         enforcementStatus = EnforcementStatus.NORMAL,
+        // This fixture stands for a fully protected device, so the filter is
+        // explicitly VERIFIED — "You're Protected" is only reachable that way.
+        shieldStatus = ShieldStatus.VERIFIED,
+        encryptedDnsBypassPossible = false,
     )
 
     private fun restricted() = ProtectionUiState(
@@ -170,5 +230,7 @@ class ZeroConfusionUiTest {
         uninstallProtectionActive = true,
         integrityVerified = true,
         enforcementStatus = EnforcementStatus.ACTIVE_RESTRICTED,
+        shieldStatus = ShieldStatus.VERIFIED,
+        encryptedDnsBypassPossible = false,
     )
 }
