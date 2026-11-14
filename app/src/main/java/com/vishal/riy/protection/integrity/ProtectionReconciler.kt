@@ -94,6 +94,14 @@ object ProtectionReconciler {
                 Log.i(TAG, "$reason for RIY itself — verifying only")
                 return
             }
+            // WhatsApp is never hidden/suspended: only its Status/Updates
+            // surface is filtered by the accessibility blocker. Keep every
+            // package-event path inert for it (defense in depth on top of the
+            // enforcement engine's own exemption).
+            if (BlockedAppPolicy.isSuspensionExemptPackage(packageName)) {
+                Log.i(TAG, "$reason for WhatsApp — package neutralization skipped")
+                return
+            }
             val live = isRestrictionLive(app)
             val wanted = isProtectionWanted(app)
             if (!live && !wanted) return
@@ -213,6 +221,9 @@ object ProtectionReconciler {
     /** Direct Device Owner hide+suspend for the protection-wanted bypass path. */
     private fun hideDirectly(context: Context, packageName: String): Boolean {
         return try {
+            // Defense in depth: no direct hide/suspend path may ever neutralise
+            // WhatsApp, even if a policy data change names it.
+            if (BlockedAppPolicy.isSuspensionExemptPackage(packageName)) return true
             val app = context.applicationContext
             val dpm = AndroidDevicePolicyBoundary(app)
             val admin = com.vishal.riy.protection.enforcement.platform.AdminComponent(

@@ -185,6 +185,16 @@ class FakeDeviceBuilder(
         )
     }
 
+    /** WhatsApp: visible + launcher-backed, but never hidden/suspended. */
+    fun whatsApp(packageName: String = "com.whatsapp") {
+        apps += FakeApp(
+            packageName = packageName,
+            label = "WhatsApp",
+            isSystem = false,
+            intentActions = setOf(ACTION_VIEW),
+        )
+    }
+
     /** A TeraBox-family app (blocked bypass). Enabled + launcher-backed. */
     fun terabox(
         packageName: String = "com.flextech.client.terabox",

@@ -65,6 +65,20 @@ object BlockedAppPolicy {
     fun isTelegramPackage(packageName: String): Boolean =
         TELEGRAM_PACKAGES.contains(packageName.trim())
 
+    // ------------------------------------------------------------ WHATSAPP
+    // Explicit EXEMPTION from package-level neutralization (hide/suspend).
+    // WhatsApp stays a NORMAL, launchable app: RIY only blocks its Status /
+    // Updates surface through the accessibility filter. The generic hardening
+    // sweep and the single-package install path must therefore never hide or
+    // suspend it, even though it is absent from the lock-task allowlist.
+
+    /** WhatsApp's package identity — never hidden or suspended by RIY. */
+    const val WHATSAPP_PACKAGE: String = "com.whatsapp"
+
+    /** True when [packageName] must NEVER be hidden or suspended by RIY. */
+    fun isSuspensionExemptPackage(packageName: String): Boolean =
+        packageName.trim() == WHATSAPP_PACKAGE
+
     // ------------------------------------------------------------ TERABOX
     // BLOCKED during protection. Resolved by metadata, not by one name alone.
 
