@@ -120,7 +120,11 @@ class BlockerVpnService : VpnService() {
         startForegroundInternal()
         return when (intent?.action) {
             ACTION_STOP -> {
+                // Explicit OFF path only. A reboot, task kill or transient
+                // revocation must never land here.
                 BlockerStateStore(this).setProtectionWanted(false)
+                com.vishal.riy.admin.AlwaysOnVpn.clear(this)
+                ProtectionWatchdog.cancel(this)
                 stopFiltering()
                 android.app.Service.START_NOT_STICKY
             }
@@ -129,6 +133,11 @@ class BlockerVpnService : VpnService() {
                     // System-initiated start (Always-On VPN): remember intent.
                     BlockerStateStore(this).setProtectionWanted(true)
                 }
+                // Bind RIY as the Device Owner's always-on VPN so the SYSTEM
+                // starts and keeps it alive after reboot/process death, and
+                // arm the fallback watchdog for ROMs that ignore it.
+                com.vishal.riy.admin.AlwaysOnVpn.apply(this)
+                ProtectionWatchdog.schedule(this)
                 startFiltering(allowRetry = intent.getBooleanExtra(EXTRA_ALLOW_RETRY, false))
                 android.app.Service.START_STICKY
             }
@@ -152,6 +161,8 @@ class BlockerVpnService : VpnService() {
                     }.onFailure { e ->
                         Log.w(TAG, "recovery on sticky restart failed: ${e.message}")
                     }
+                    com.vishal.riy.admin.AlwaysOnVpn.apply(this)
+                    ProtectionWatchdog.schedule(this)
                     startFiltering(allowRetry = true)
                     android.app.Service.START_STICKY
                 } else {
@@ -165,9 +176,7 @@ class BlockerVpnService : VpnService() {
     override fun onRevoke() {
         // VPN consent revoked, Always-On disabled, or another VPN took over:
         // protection is gone — report that honestly. The security event is
-        // recorded (no content, only the fact of revocation); recovery on next
-        // foreground/boot restores protection when the persisted session is
-        // still live.
+        // recorded (no content, only the fact of revocation).
         Log.w(TAG, "VPN revoked by system/user")
         runCatching {
             com.vishal.riy.protection.events.PrefsProtectionEventStore(this).append(
@@ -175,12 +184,33 @@ class BlockerVpnService : VpnService() {
                     eventId = "vpn-revoke-${System.currentTimeMillis()}",
                     type = com.vishal.riy.protection.events.ProtectionLogEvent.Type.INTEGRITY_MISMATCH,
                     timestamp = System.currentTimeMillis(),
-                    message = "VPN revoked by system/user; protection OFF until restored",
+                    message = "VPN revoked by system/user; protection will self-restore",
                 ),
             )
         }
-        BlockerStateStore(this).setProtectionWanted(false)
+        // IMPORTANT: the user's persisted ON choice is NOT cleared here. A
+        // revocation is exactly the moment the blocker must come back: with
+        // Device Owner always-on VPN the system re-binds the service, and the
+        // watchdog is an accelerated retry for ROMs that do not. Clearing the
+        // intent here is what previously left protection OFF until a manual
+        // Enable Protection tap.
         stopFiltering()
+        if (BlockerStateStore(this).isProtectionWanted()) {
+            ProtectionWatchdog.scheduleSoon(this)
+        }
+    }
+
+    /**
+     * The OEM task killer removes the task and then kills this process. This
+     * callback is the last chance to leave a restart request in the SYSTEM's
+     * AlarmManager, which survives us.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.i(TAG, "task removed; arming immediate protection watchdog")
+        if (BlockerStateStore(this).isProtectionWanted()) {
+            ProtectionWatchdog.scheduleSoon(this)
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {

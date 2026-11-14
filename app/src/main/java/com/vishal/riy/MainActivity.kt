@@ -296,9 +296,18 @@ class MainActivity : AppCompatActivity() {
      * never overrides a real OFF/FAILED reported by the service itself.
      */
     private fun restoreProtectionIfInterrupted() {
+        val wanted = BlockerStateStore(this).isProtectionWanted()
+        if (!wanted) return
+
+        // Keep the system-level binding healthy even when the in-memory phase
+        // already says CONNECTED: after an OEM update the Device Owner policy
+        // can be lost while the tunnel is still up, and the next reboot would
+        // then have no always-on VPN to restore.
+        com.vishal.riy.admin.AlwaysOnVpn.apply(this)
+        com.vishal.riy.blocker.ProtectionWatchdog.schedule(this)
+
         val phase = BlockerState.current().phase
-        if (BlockerStateStore(this).isProtectionWanted() &&
-            phase != BlockerState.Phase.CONNECTED &&
+        if (phase != BlockerState.Phase.CONNECTED &&
             phase != BlockerState.Phase.CONNECTING
         ) {
             Log.i("BlockerApp", "protection wanted but $phase — restarting service")

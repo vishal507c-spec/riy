@@ -75,6 +75,11 @@ class ProtectionViewModel(application: Application) : AndroidViewModel(applicati
      */
     fun enableProtection(context: Context) {
         stateStore.setProtectionWanted(true)
+        // Bind the Device Owner always-on VPN immediately: from now on the
+        // SYSTEM is responsible for restarting the filter at boot and after
+        // this process is killed, not the UI.
+        com.vishal.riy.admin.AlwaysOnVpn.apply(context)
+        com.vishal.riy.blocker.ProtectionWatchdog.schedule(context)
         // allowRetry = false: this is a USER-initiated start, so the boot-retry
         // budget must reset. With allowRetry=true the counter kept its previous
         // value and, once the 12 boot attempts had been spent, every subsequent

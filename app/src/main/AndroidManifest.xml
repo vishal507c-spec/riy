@@ -114,7 +114,8 @@
             android:name=".blocker.BlockerVpnService"
             android:exported="true"
             android:foregroundServiceType="specialUse"
-            android:permission="android.permission.BIND_VPN_SERVICE">
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:stopWithTask="false">
             <intent-filter>
                 <action android:name="android.net.VpnService" />
             </intent-filter>
@@ -123,14 +124,23 @@
                 android:value="DNS-based adult content filtering VPN" />
         </service>
 
-        <!-- Restores protection automatically after a device reboot. -->
+        <!-- Restores protection automatically after a device reboot or an
+             in-place self-update. -->
         <receiver
             android:name=".blocker.BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!-- Alarm-held fallback that re-asserts protection on ROMs that kill
+             the process despite the Device Owner always-on VPN. Not exported:
+             only RIY's own PendingIntent can trigger it. -->
+        <receiver
+            android:name=".blocker.ProtectionWatchdogReceiver"
+            android:exported="false" />
 
         <!-- Device Admin component. This is the anchor the system uses to
              identify RIY when it is provisioned as the Device Owner. Only the
