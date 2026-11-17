@@ -19,7 +19,7 @@ object VersionUtils {
 
     /** Strips an optional leading "v"/"V" from a release tag ("v1.0.5" -> "1.0.5"). */
     fun stripTagPrefix(tag: String): String =
-        if (tag.length > 1 && (tag[0] == 'v' || tag[0] == 'V')) tag.substring(1) else tag
+        tag.trim().dropWhile { it == 'v' || it == 'V' }
 
     /**
      * Parses "MAJOR.MINOR.PATCH" (with optional v/V prefix) into a numeric

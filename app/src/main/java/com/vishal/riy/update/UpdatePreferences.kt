@@ -3,10 +3,9 @@ package com.vishal.riy.update
 import android.content.Context
 
 /**
- * Throttles update checks so app startups stay fast and the unauthenticated
- * GitHub API rate limit (60 req/hour/device) is respected. One lightweight
- * check per hour at most; "Later" simply defers to the next qualifying
- * lifecycle event.
+ * Throttles update checks so app startups stay fast. One lightweight check per
+ * minute at most (see [CHECK_INTERVAL_MS]);
+ * "Later" simply defers to the next qualifying lifecycle event.
  *
  * It also stores the ONE piece of state that makes the "Update Now → permission
  * → Settings → blocked → back → same dialog" loop impossible: whether the

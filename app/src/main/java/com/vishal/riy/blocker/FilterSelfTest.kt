@@ -51,12 +51,20 @@ class FilterSelfTest(
             socket.soTimeout = timeoutMs
             // Numeric literal only: getByName() performs no DNS lookup here.
             val address = InetAddress.getByName(dnsServer)
-            val query = SafeSearchRules.buildDnsQuery(host, TYPE_A, id = nextId())
+            val id = nextId()
+            val query = SafeSearchRules.buildDnsQuery(host, TYPE_A, id = id)
             socket.send(DatagramPacket(query, query.size, address, dnsPort))
             val buffer = ByteArray(RESPONSE_BUFFER)
             val packet = DatagramPacket(buffer, buffer.size)
             socket.receive(packet)
-            DnsProtocol.firstAddressRdata(buffer.copyOf(packet.length), TYPE_A)
+            val raw = buffer.copyOf(packet.length)
+            // Never trust a reply to some other query: a stale/spoofed answer
+            // must not produce a false VERIFIED. Check transaction ID and QR.
+            if (raw.size < 4) return null
+            val receivedId = ((raw[0].toInt() and 0xFF) shl 8) or (raw[1].toInt() and 0xFF)
+            if (receivedId != id) return null
+            if (raw[2].toInt() and 0x80 == 0) return null
+            DnsProtocol.firstAddressRdata(raw, TYPE_A)
         } catch (_: Exception) {
             null // timeout, unreachable filter, malformed answer
         } finally {

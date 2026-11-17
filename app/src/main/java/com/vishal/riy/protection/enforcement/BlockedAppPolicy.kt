@@ -204,7 +204,6 @@ object BlockedAppPolicy {
         "doh.dns.sb",
         "dns.nextdns.io",
         "controld.com",
-        "doh.dns.sb",
         "dns.sb",
         "sdns.cloudflare.com",
         "encrypted-dns.google",

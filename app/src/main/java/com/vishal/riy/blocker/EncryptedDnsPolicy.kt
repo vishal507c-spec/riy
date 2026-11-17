@@ -20,7 +20,8 @@ import com.vishal.riy.protection.enforcement.platform.DevicePolicyBoundary
  *  - It does NOT reach a browser's own Secure DNS / DoH setting. Chrome's
  *    per-app encrypted resolver is not exposed by any public Android API, so no
  *    amount of Device Owner policy can stop it. See [EncryptedDnsExposure].
- *  - It is a no-op without Device Owner, is idempotent, and is reversible.
+ *  - It is a no-op without Device Owner, is idempotent, and is reversible via
+ *    [clear] on the explicit OFF path.
  */
 object EncryptedDnsPolicy {
 

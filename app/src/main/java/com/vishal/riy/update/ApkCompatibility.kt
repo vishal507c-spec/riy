@@ -98,20 +98,23 @@ object ApkCompatibility {
 
         val installedCode = installed.versionCode
         val candidateCode = candidate.versionCode
-        if (installedCode != null && candidateCode != null) {
-            if (candidateCode == installedCode) {
-                return ApkAssessment(
-                    disposition = ApkDisposition.ALREADY_CURRENT,
-                    messageRes = R.string.update_reject_same_version,
-                )
-            }
-            if (candidateCode < installedCode) {
-                // An older build is rejected rather than offered. A `-d`
-                // downgrade command is deliberately not generated: it could be
-                // copied accidentally, and downgrading under policy restrictions
-                // deserves an explicit choice, not an irreversible side effect.
-                return reject(ApkRejection.DOWNGRADE, R.string.update_reject_downgrade)
-            }
+        // Fail closed: an unreadable version on either side must never skip the
+        // downgrade check, exactly as an unreadable signer is rejected above.
+        if (installedCode == null || candidateCode == null) {
+            return reject(ApkRejection.CORRUPT, R.string.update_reject_corrupt)
+        }
+        if (candidateCode == installedCode) {
+            return ApkAssessment(
+                disposition = ApkDisposition.ALREADY_CURRENT,
+                messageRes = R.string.update_reject_same_version,
+            )
+        }
+        if (candidateCode < installedCode) {
+            // An older build is rejected rather than offered. A `-d`
+            // downgrade command is deliberately not generated: it could be
+            // copied accidentally, and downgrading under policy restrictions
+            // deserves an explicit choice, not an irreversible side effect.
+            return reject(ApkRejection.DOWNGRADE, R.string.update_reject_downgrade)
         }
 
         return ApkAssessment(

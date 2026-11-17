@@ -8,7 +8,7 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** TEMPORARY diagnostic tag; never contains credentials. */
+/** Diagnostic tag; never contains credentials. */
 private const val LOG_TAG = "RiyUpdate"
 
 /**
@@ -62,10 +62,16 @@ object UpdateChecker {
                 UpdateToken.value?.let {
                     connection.setRequestProperty("Authorization", "Bearer $it")
                 }
-                connection.instanceFollowRedirects = true
+                // Never follow a redirect while carrying Authorization: the
+                // token must not leave the pinned api.github.com host.
+                connection.instanceFollowRedirects = false
 
                 val code = connection.responseCode
                 Log.i(LOG_TAG, "HTTP response code=$code")
+                if (code in 300..399) {
+                    Log.w(LOG_TAG, "redirect refused while authenticated; treating as no update")
+                    return@withContext null
+                }
                 if (code != HttpURLConnection.HTTP_OK) {
                     // 404 = no releases yet, 403 = rate limited, 5xx = GitHub down,
                     // 401/403 = auth failed (no valid token / insufficient scope).

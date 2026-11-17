@@ -46,7 +46,10 @@ object LockEngine {
     private fun isDuplicate(state: LockState, domain: String, now: Long): Boolean {
         if (state.lastDomain != domain) return false
         if (state.lastDetectionEpochMillis == NO_LOCK) return false
-        return now - state.lastDetectionEpochMillis < DEDUP_WINDOW_MS
+        val delta = now - state.lastDetectionEpochMillis
+        // A backward clock jump (NTP correction / user time change) must not
+        // turn a genuine repeat detection into a silently dropped duplicate.
+        return delta in 0L until DEDUP_WINDOW_MS
     }
 
     /** True while the persisted lock deadline has not passed. */

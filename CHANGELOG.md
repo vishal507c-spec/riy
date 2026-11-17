@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.2.0 - 2026-11-17
+- Invariants are now enforced at build time (`InvariantEnforcementTest`): no accessibility service, no removed guard symbols, no token in release, and the invariant document must stay complete.
+- Self-test validates DNS transaction ID and QR flag before trusting a reply; dedup is clock-skew safe; update checks refuse authenticated redirects; unknown version codes fail closed; version-tag stripping matches Gradle.
+- Filter failure tears down the tun instead of blackholing DNS; IPv6 upstream resolvers added; Drive snapshot creation time is stable (no false generation bumps); duplicate bypass host removed.
+
 ## v3.1.0 - 2026-11-17
 - Full enterprise-style UI: one design system across dashboard, lock screen, tracker, check-in and navigation; standard bottom navigation; calm Material 3 surfaces.
 - Ten honest tracker insights: 7-day and 14-day ribbons, NO days this week, answered days, best recent run, current/best-ever run, recorded days, days since last YES/NO, next milestone and today's status. All are counts of real answers — no estimates, scores, percentages or health claims.

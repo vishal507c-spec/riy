@@ -390,6 +390,15 @@ class BlockerVpnService : VpnService() {
         kind: BlockerState.FailureKind = BlockerState.FailureKind.VPN_DISCONNECTED,
     ) {
         mainHandler.removeCallbacks(retryRunnable)
+        // Tear the tun down BEFORE reporting FAILED: leaving it open with no
+        // filter loop silently blackholes DNS and makes a later start a no-op.
+        running.set(false)
+        runCatching { vpnInterface?.close() }
+        vpnInterface = null
+        worker?.let { runCatching { it.join(500) } }
+        worker = null
+        runCatching { scope.cancel() }
+        scope = newScope()
         // The user's ON choice is PRESERVED: the FAILED phase itself signals
         // "not protected" honestly, and the app self-heals on next open so a
         // transient boot race or another VPN letting go can recover.
@@ -713,7 +722,12 @@ class BlockerVpnService : VpnService() {
         private const val RETRY_DELAY_MS = 10_000L
 
         /** Real upstream resolvers used for allowed queries. */
-        private val UPSTREAM_DNS = arrayOf("1.1.1.1", "8.8.8.8")
+        // IPv4 and IPv6 literals: on IPv6-only/NAT64-less networks an IPv4-only
+        // upstream list made every allowed query SERVFAIL.
+        private val UPSTREAM_DNS = arrayOf(
+            "1.1.1.1", "8.8.8.8",
+            "2606:4700:4700::1111", "2001:4860:4860::8888",
+        )
 
         /**
          * Public resolver IPs routed into the tun so that (a) apps hardcoding

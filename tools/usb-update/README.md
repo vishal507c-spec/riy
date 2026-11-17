@@ -39,7 +39,7 @@ chmod +x usb-update.sh
 5. verifies package name, versionCode and signing certificate with
    `aapt2` / `apksigner` when they are available;
 6. runs **`adb install -r`**, so the update is in place and all app data —
-   settings, blocker configuration, accessibility grants — survives.
+   settings and blocker configuration — survives.
 
 If the GitHub release repository is private, set a read-only `GITHUB_TOKEN`
 environment variable before running either helper. The token is used only for

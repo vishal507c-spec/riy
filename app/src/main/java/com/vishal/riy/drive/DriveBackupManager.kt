@@ -58,7 +58,7 @@ class DriveBackupManager(private val appContext: Context) {
                 prefs.edit().putString(KEY_SNAPSHOT_ID, it).apply()
             },
             generation = gen,
-            createdAt = System.currentTimeMillis(),
+            createdAt = snapshotCreatedAt(),
             appVersion = BuildConfig.VERSION_NAME,
         )
         return bytes to gen
@@ -113,7 +113,7 @@ class DriveBackupManager(private val appContext: Context) {
                 stores = dumpStores(),
                 snapshotId = prefs.getString(KEY_SNAPSHOT_ID, null) ?: UUID.randomUUID().toString(),
                 generation = useGen,
-                createdAt = System.currentTimeMillis(),
+                createdAt = snapshotCreatedAt(),
                 appVersion = BuildConfig.VERSION_NAME,
             )
         } else {
@@ -205,7 +205,7 @@ class DriveBackupManager(private val appContext: Context) {
                         useBytes = RiySnapshot.build(
                             dumpStores(),
                             prefs.getString(KEY_SNAPSHOT_ID, null) ?: UUID.randomUUID().toString(),
-                            useGen, System.currentTimeMillis(), BuildConfig.VERSION_NAME,
+                            useGen, snapshotCreatedAt(), BuildConfig.VERSION_NAME,
                         )
                     } else {
                         useGen = gen
@@ -478,6 +478,16 @@ class DriveBackupManager(private val appContext: Context) {
         )
     }
 
+    /**
+     * Created once and reused: a fresh timestamp on every pass would change the
+     * content hash and break the idempotent "zero writes" path.
+     */
+    private fun snapshotCreatedAt(): Long =
+        prefs.getLong(KEY_SNAPSHOT_CREATED_AT, 0L).takeIf { it > 0L }
+            ?: System.currentTimeMillis().also {
+                prefs.edit().putLong(KEY_SNAPSHOT_CREATED_AT, it).apply()
+            }
+
     private companion object {
         const val TAG = "RiyDrive"
         const val PREFS_NAME = "riy_drive_prefs"
@@ -490,6 +500,7 @@ class DriveBackupManager(private val appContext: Context) {
         const val KEY_AUTO_RESTORED = "auto_restored"
         const val KEY_GENERATION = "snapshot_generation"
         const val KEY_SNAPSHOT_ID = "snapshot_id"
+        const val KEY_SNAPSHOT_CREATED_AT = "snapshot_created_at"
         const val KEY_LAST_SHA = "last_snapshot_sha"
         const val KEY_LAST_BACKUP = "last_backup"
         const val KEY_SYNC_SHA = "sync_pending_sha"

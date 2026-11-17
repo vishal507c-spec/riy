@@ -27,7 +27,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
-/** TEMPORARY diagnostic tag; never contains credentials. */
+/** Diagnostic tag; never contains credentials. */
 private const val LOG_TAG = "RiyUpdate"
 
 /**
@@ -325,6 +325,12 @@ class MainActivity : AppCompatActivity() {
         if (!canCheck) return
         lifecycleScope.launch {
             val installedCode = currentVersionCode()
+            if (installedCode == null) {
+                // Unknown version: skip the check instead of treating it as 0,
+                // which would make every release look newer.
+                updatePreferences.markChecked()
+                return@launch
+            }
             Log.i(LOG_TAG, "installedVersionCode=$installedCode")
             val info = try {
                 UpdateChecker.checkForUpdate(installedCode)
@@ -393,7 +399,8 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private fun currentVersionCode(): Long = try {
+    /** Null on any read failure, so a transient error can never look like v0. */
+    private fun currentVersionCode(): Long? = try {
         val pm = packageManager.getPackageInfo(packageName, 0)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
             pm.longVersionCode
@@ -402,6 +409,6 @@ class MainActivity : AppCompatActivity() {
             pm.versionCode.toLong()
         }
     } catch (_: Exception) {
-        0L
+        null
     }
 }
