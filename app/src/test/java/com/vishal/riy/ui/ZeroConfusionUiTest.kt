@@ -122,13 +122,16 @@ class ZeroConfusionUiTest {
         // zero-confusion contract at the string level.
         states.forEach { state ->
             val presentation = state.userFacing()
-            listOf(
-                R.string.status_protected_title,
-                R.string.status_restricted_title,
-                R.string.status_hardened_title,
-                R.string.status_recovery_title,
-                R.string.status_mismatch_title,
-            ).contains(presentation.titleRes)
+            assertTrue(
+                "developer state name leaked into a title: ${presentation.titleRes}",
+                listOf(
+                    R.string.status_protected_title,
+                    R.string.status_restricted_title,
+                    R.string.status_hardened_title,
+                    R.string.status_recovery_title,
+                    R.string.status_mismatch_title,
+                ).contains(presentation.titleRes),
+            )
         }
     }
 

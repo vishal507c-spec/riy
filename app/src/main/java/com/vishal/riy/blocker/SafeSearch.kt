@@ -101,7 +101,11 @@ class SafeSearchEnforcer(
         val safeHost = SafeSearchRules.safeHostFor(q.name) ?: return null
         val (v4, v6) = currentVips(safeHost)
         return when (q.type) {
+            // Fail CLOSED: a mapped search host whose safe VIP has not been
+            // resolved yet must never be forwarded to its real (unsafe) IPs.
+            // NODATA makes it unreachable until the cached VIP is available.
             TYPE_A -> v4?.let { DnsProtocol.buildAddressResponse(query, q, it) }
+                ?: DnsProtocol.buildNoDataResponse(query, q)
             TYPE_AAAA -> v6?.let { DnsProtocol.buildAddressResponse(query, q, it) }
                 ?: DnsProtocol.buildNoDataResponse(query, q)
             else -> DnsProtocol.buildNoDataResponse(query, q)

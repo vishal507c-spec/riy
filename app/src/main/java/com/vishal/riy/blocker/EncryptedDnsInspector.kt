@@ -91,7 +91,14 @@ object EncryptedDnsInspector {
         // "Automatic"/"off" uses no fixed server, so nothing must be spared.
         if (!isPrivateDnsConfigured(context)) return emptySet()
         val specifier = privateDnsSpecifier(context)?.lowercase() ?: return emptySet()
-        return KNOWN_PRIVATE_DNS_HOSTS[specifier].orEmpty().toSet()
+        val known = KNOWN_PRIVATE_DNS_HOSTS[specifier].orEmpty()
+        // A custom DoT provider may resolve to an IP we route into the tun.
+        // Resolve its specifier too so strict Private DNS never dies with
+        // "No internet"; failures simply leave the known set unchanged.
+        val resolved = runCatching { java.net.InetAddress.getAllByName(specifier) }
+            .getOrDefault(emptyArray())
+            .mapNotNull { runCatching { it.hostAddress }.getOrNull() }
+        return (known + resolved).toSet()
     }
 
     /**

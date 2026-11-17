@@ -45,7 +45,6 @@ class PackageStateWatcher : BroadcastReceiver() {
                     val replacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
                     Log.i(TAG, "package_added pkg=$pkg replacing=$replacing")
                     ProtectionReconciler.reconcilePackage(context, pkg, "package_added")
-                    if (pkg == context.packageName) verify("package_added", context)
                 }
             }
 

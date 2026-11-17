@@ -25,7 +25,7 @@ class PrefsProtectionStateStore(context: Context) : ProtectionStateStore {
     override fun save(session: ProtectionSession) {
         prefs.edit()
             .putString(KEY_SESSION, ProtectionSessionSerialization.encode(session))
-            .apply()
+            .commit() // authoritative session must survive an immediate OEM kill
         // Protection state changed → coalesced Drive snapshot (never throws).
         com.vishal.riy.drive.DriveSync.requestBackup()
     }

@@ -27,7 +27,9 @@ class PrefsLockStore(private val context: Context) : LockStore {
         LockStateSerialization.decode(prefs.getString(KEY_STATE, null)) ?: LockState.EMPTY
 
     override fun saveState(state: LockState) {
-        prefs.edit().putString(KEY_STATE, LockStateSerialization.encode(state)).apply()
+        // Authoritative deadline: commit synchronously so an immediate OEM
+        // process kill cannot lose the lock the user just armed.
+        prefs.edit().putString(KEY_STATE, LockStateSerialization.encode(state)).commit()
         // Protection state changed → coalesced Drive snapshot (never throws).
         com.vishal.riy.drive.DriveSync.requestBackup()
         // The deadline's authoritative change point is also where the system

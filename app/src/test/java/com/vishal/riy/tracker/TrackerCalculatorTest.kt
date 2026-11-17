@@ -351,7 +351,10 @@ class TrackerDatesTest {
         val inKolkata = TrackerDates.epochDayOf(instant, TimeZone.getTimeZone("Asia/Kolkata"))
         val inUtc = TrackerDates.epochDayOf(instant, TimeZone.getTimeZone("UTC"))
         assertEquals(20_000L, inKolkata)
-        assertTrue(inUtc != inKolkata || inUtc == 20_000L) // differs, or coincides
+        // Kolkata is UTC+5:30, so its local start-of-day is still the previous
+        // UTC calendar day. Pin the real relationship, not a tautology.
+        assertEquals(19_999L, inUtc)
+        assertTrue(inUtc != inKolkata)
     }
 
     @Test
