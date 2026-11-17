@@ -100,7 +100,10 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
         val today = TrackerDates.epochDayOf(now, TimeZone.getDefault())
         if (store.wasPromptedOn(today)) return
         val pending = TrackerCheckIn.pendingDate(today) { store.hasRecord(it) } ?: return
-        if (!TrackerCheckIn.shouldAutoPrompt(pending, alreadyPromptedToday = true)) return
+        // Line 101 already established that today had not been prompted, so
+        // passing `true` here made this branch unreachable (the in-app check-in
+        // never opened). Pass the real value.
+        if (!TrackerCheckIn.shouldAutoPrompt(pending, alreadyPromptedToday = false)) return
         store.markPrompted(today)
         openCheckIn(pending)
     }

@@ -165,6 +165,16 @@ object ProtectionReconciler {
     fun reconcileAll(context: Context, reason: String) {
         val app = context.applicationContext
         try {
+            // Re-arm the system expiry alarm after boot / process death: the
+            // persisted deadline is the only authority and may still be ahead.
+            val deadline = com.vishal.riy.lock.PrefsLockStore(app)
+                .loadState().lockEndEpochMillis
+            if (deadline == com.vishal.riy.lock.LockEngine.NO_LOCK) {
+                com.vishal.riy.protection.recovery.RestrictionExpiryScheduler.cancel(app)
+            } else {
+                com.vishal.riy.protection.recovery.RestrictionExpiryScheduler.schedule(app, deadline)
+            }
+
             val recovery = ProtectionEventProcessor.recoveryForContext(app)
             val result = runCatching { recovery.recoverWithResult() }.getOrNull()
             Log.i(
@@ -179,6 +189,21 @@ object ProtectionReconciler {
             }
         } catch (e: Exception) {
             Log.e(TAG, "reconcileAll failed ($reason)", e)
+        }
+    }
+
+    /**
+     * Explicit teardown for the user's OFF action. Releases hardening and all
+     * protected-mode user restrictions through the same Device Owner seat that
+     * applied them. Never touches Device Ownership or uninstall protection.
+     */
+    fun restoreAll(context: Context, reason: String) {
+        val app = context.applicationContext
+        try {
+            val result = newEngine(app).restoreNormalPolicyWithResult()
+            Log.i(TAG, "restoreAll ($reason): result=$result")
+        } catch (e: Exception) {
+            Log.e(TAG, "restoreAll failed ($reason)", e)
         }
     }
 

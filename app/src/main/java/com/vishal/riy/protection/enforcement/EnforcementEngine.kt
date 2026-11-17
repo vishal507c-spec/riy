@@ -47,6 +47,17 @@ interface EnforcementEngine {
     fun restoreNormalPolicy()
 
     /**
+     * Restores and reports what the platform actually did. A caller that drops
+     * persisted state MUST use this, never the void form: a failed restore must
+     * leave the session intact for retry. The default keeps lightweight fakes
+     * simple; the real engine overrides it with a live read-back.
+     */
+    fun restoreNormalPolicyWithResult(): PolicyApplicationResult {
+        restoreNormalPolicy()
+        return PolicyApplicationResult.APPLIED
+    }
+
+    /**
      * Re-checks the live platform state and corrects it to match the persisted
      * session (for example after an app restart or a reboot).
      *

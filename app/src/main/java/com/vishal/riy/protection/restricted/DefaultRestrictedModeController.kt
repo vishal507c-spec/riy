@@ -4,6 +4,7 @@ import com.vishal.riy.lock.LockEngine
 import com.vishal.riy.lock.LockStore
 import com.vishal.riy.protection.enforcement.EnforcementEngine
 import com.vishal.riy.protection.enforcement.LockTaskPolicy
+import com.vishal.riy.protection.enforcement.PolicyApplicationResult
 import com.vishal.riy.protection.policy.ProtectionState
 import com.vishal.riy.protection.state.ProtectionSession
 import com.vishal.riy.protection.state.ProtectionStateStore
@@ -62,8 +63,11 @@ class DefaultRestrictedModeController(
     @Synchronized
     override fun exit() {
         if (store.current() == null) return
-        enforcement.restoreNormalPolicy()
-        store.clear()
+        val result = enforcement.restoreNormalPolicyWithResult()
+        // Never drop the persisted authority when the platform did NOT confirm
+        // the restore. Clearing the session there makes the UI claim NORMAL
+        // while a restriction is still live, and leaves nothing to retry.
+        if (result == PolicyApplicationResult.APPLIED) store.clear()
     }
 
     /**

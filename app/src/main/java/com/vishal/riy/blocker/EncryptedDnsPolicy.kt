@@ -32,6 +32,21 @@ object EncryptedDnsPolicy {
         boundary.hasUserRestriction(admin(context), DevicePolicyBoundary.RESTRICTION_CONFIG_PRIVATE_DNS)
     }.getOrDefault(false)
 
+    /**
+     * Removes the restriction again. The OFF path MUST call this: applying the
+     * restriction on filter start without a symmetric release would leave
+     * Private DNS locked down forever after the user turns protection off.
+     */
+    fun clear(context: Context): Boolean = runCatching {
+        val boundary = boundary(context)
+        if (!boundary.isDeviceOwnerApp(context.packageName)) return false
+        boundary.clearUserRestriction(
+            admin(context),
+            DevicePolicyBoundary.RESTRICTION_CONFIG_PRIVATE_DNS,
+        )
+        !boundary.hasUserRestriction(admin(context), DevicePolicyBoundary.RESTRICTION_CONFIG_PRIVATE_DNS)
+    }.getOrDefault(false)
+
     /** Reads back the live platform state rather than assuming it took. */
     fun isRestricted(context: Context): Boolean = runCatching {
         val boundary = boundary(context)

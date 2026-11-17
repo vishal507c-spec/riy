@@ -69,6 +69,11 @@ class AndroidDevicePolicyBoundary(
         }
     }
 
+    // getLockTaskPackages was added in API 26; below that, membership is
+    // verified with isLockTaskPermitted (available since API 23) instead.
+    override val lockTaskPackagesReadable: Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+
     // setLockTaskFeatures/getLockTaskFeatures exist only from API 28 (P).
     override val lockTaskFeaturesSupported: Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.P

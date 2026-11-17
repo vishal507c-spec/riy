@@ -50,6 +50,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vishal.riy.R
+import com.vishal.riy.blocker.ShieldStatus
 import com.vishal.riy.protection.enforcement.AllowedAppCategory
 import com.vishal.riy.protection.ui.ProtectionUiState
 
@@ -128,7 +129,10 @@ fun shieldLayers(state: ProtectionUiState): List<ShieldLayer> {
             titleRes = R.string.layer_network_title,
             descRes = R.string.layer_network_desc,
             moreRes = R.string.layer_network_more,
-            status = if (state.protectionActive) ShieldLayerStatus.ACTIVE
+            // `protectionActive` is true even for RUNNING_UNVERIFIED. Only a
+            // self-test-proven filter may be painted green as ACTIVE.
+            status = if (state.shieldStatus == ShieldStatus.VERIFIED) ShieldLayerStatus.ACTIVE
+            else if (state.shieldStatus.isFiltering) ShieldLayerStatus.READY
             else ShieldLayerStatus.UNAVAILABLE,
         ),
         ShieldLayer(

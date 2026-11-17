@@ -60,6 +60,18 @@ class UpdatePreferences(context: Context) {
         prefs.edit().putBoolean(KEY_INSTALL_BLOCKED, true).apply()
     }
 
+    /**
+     * Forgets a transient install refusal so a later attempt can re-probe the
+     * real environment (including the Device Owner self-update exemption).
+     * [KEY_PROMPTED_GRANT] stays sticky: loop prevention must survive a retry.
+     */
+    fun clearInstallRefusals() {
+        prefs.edit()
+            .remove(KEY_DIRECT_REFUSED)
+            .remove(KEY_INSTALL_BLOCKED)
+            .apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "app_update_prefs"
         private const val KEY_LAST_CHECK = "last_check_ms"

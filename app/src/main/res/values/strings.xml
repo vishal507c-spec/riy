@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Riy</string>
+    <string name="shield_subtitle">Daily protection shield</string>
     <string name="app_version_label">Version %1$s</string>
 
     <!-- Actions -->

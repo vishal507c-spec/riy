@@ -1,5 +1,6 @@
 package com.vishal.riy.ui
 
+import com.vishal.riy.blocker.ShieldStatus
 import com.vishal.riy.protection.enforcement.AllowedApp
 import com.vishal.riy.protection.enforcement.AllowedAppCategory
 import com.vishal.riy.protection.enforcement.EnforcementStatus
@@ -30,10 +31,21 @@ class ShieldLayersTest {
     }
 
     @Test
-    fun `network layer is active only while the filter really runs`() {
+    fun `network layer is active only for a self-test verified filter`() {
         assertEquals(
             ShieldLayerStatus.ACTIVE,
-            layer(idle().copy(protectionActive = true), ShieldLayerId.NETWORK).status,
+            layer(
+                idle().copy(shieldStatus = ShieldStatus.VERIFIED),
+                ShieldLayerId.NETWORK,
+            ).status,
+        )
+        // A running but unverified filter must never be painted green.
+        assertEquals(
+            ShieldLayerStatus.READY,
+            layer(
+                idle().copy(shieldStatus = ShieldStatus.RUNNING_UNVERIFIED),
+                ShieldLayerId.NETWORK,
+            ).status,
         )
         assertEquals(
             ShieldLayerStatus.UNAVAILABLE,

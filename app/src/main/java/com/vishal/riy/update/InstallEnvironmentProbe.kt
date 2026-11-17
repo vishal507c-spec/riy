@@ -141,6 +141,34 @@ object InstallEnvironmentProbe {
         return probe(app, promptedForGrant, installBlockedObserved).copy(ownRestrictionLifted = lifted)
     }
 
+    /**
+     * Puts OUR OWN restriction back after an update attempt that did not or
+     * cannot install. This makes the exemption's "momentary window" real
+     * instead of relying on an unrelated foreground/boot reconciliation to
+     * happen before the user walks away. Safe no-op for non-owners and re-adds
+     * only a restriction this app is allowed to manage.
+     */
+    fun restoreOwnUpdateExemption(context: Context): Boolean {
+        val app = context.applicationContext
+        if (!isDeviceOrProfileOwner(app)) return false
+        return try {
+            val boundary = AndroidDevicePolicyBoundary(app)
+            val admin = AdminComponent(
+                app.packageName,
+                RiyDeviceAdminReceiver::class.java.name,
+            )
+            val restored = boundary.addUserRestriction(
+                admin,
+                DevicePolicyBoundary.RESTRICTION_INSTALL_UNKNOWN_SOURCES,
+            )
+            Log.i(TAG, "own unknown-sources restriction restored=$restored")
+            restored
+        } catch (e: Exception) {
+            Log.w(TAG, "self-update exemption restore failed: ${e.javaClass.simpleName}")
+            false
+        }
+    }
+
     // ------------------------------------------------------------- APK facts
 
     /** Facts about the INSTALLED app (always readable). */

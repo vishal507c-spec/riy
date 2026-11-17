@@ -1,5 +1,33 @@
 # Changelog
 
+## v3.0.0 - 2026-11-17
+- Full dashboard redesign: a calm shield console with a new brand header, a breathing status hero, a single readable status card, quick truthful fact cards, a clear tracker entry, and softer rounded Material 3 surfaces. Refreshed colour palette and typography.
+- All prior state-truthfulness rules are preserved: only a verified filter is painted green, the single authoritative shield status drives every surface, and the one enable action stays gated behind system VPN consent.
+
+## v2.9.3 - 2026-11-17
+- Removed the WhatsApp Status blocker and its Accessibility Service completely: RIY no longer declares, requests or enables any Accessibility Service. Adult DNS filtering, the 2-hour lock, Device Owner/admin policies and all other guards are unchanged.
+- Self-update safety: no GitHub token in release APKs; install results are delivered to a stable Activity host so "blocked by admin" correctly routes to USB; USB choice survives download failures; transient refusals no longer permanently disable the Device Owner exemption; the momentary unknown-sources lift is always restored.
+- Restriction lifecycle: explicit OFF now releases the private-DNS and protected-mode restrictions; a system alarm reconciles the restriction exactly when the 2-hour deadline passes; a failed platform restore no longer drops the persisted session; API 24/25 verifies allowlist membership per package instead of oscillating on an unreadable allowlist.
+- UI truthfulness: one authoritative shield status (no parallel derivation), unverified filters are never painted green, and the daily in-app check-in prompt works.
+
+## v2.9.2 - 2026-11-14
+- Keep protection alive across reboot, task removal and self-update.
+
+## v2.9.1 - 2026-11-14
+- Never suspend WhatsApp during protection.
+
+## v2.9.0 - 2026-10-09
+- Make the UI readable and explain the tracker.
+
+## v2.8.6 - 2026-10-09
+- Fix "No internet" caused by the filter breaking Android's Private DNS.
+
+## v2.8.4 - 2026-10-09
+- Fix "Enable Protection" button being a no-op.
+
+## v2.8.0 - 2026-10-09
+- Daily check-in tracker with a private streak calendar and one morning reminder.
+
 ## v2.7.0 - 2026-10-04
 - WhatsApp Status / Updates blocker: a new on-device UI guard stops the Status surface while leaving WhatsApp itself completely normal — chats, individual and group messages, calls, notifications, in-chat photos and videos, search and settings all keep working. Official WhatsApp is never modified, patched, decompiled, root-required or network-intercepted, and no manifest permission was added.
 - Generic, reusable blocking engine (`guard/`): `UiGuardRule` + `UiGuardEngine` are the single blocking system, and WhatsApp Status is just one target/rule (`WhatsAppStatusRule`). Adding another blocked surface means adding a rule, not a second blocker.

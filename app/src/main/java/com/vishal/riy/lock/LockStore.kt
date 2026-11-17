@@ -18,7 +18,7 @@ interface LockStore {
 }
 
 /** SharedPreferences-backed implementation; keeps everything on the device. */
-class PrefsLockStore(context: Context) : LockStore {
+class PrefsLockStore(private val context: Context) : LockStore {
 
     private val prefs = context.applicationContext
         .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -30,6 +30,15 @@ class PrefsLockStore(context: Context) : LockStore {
         prefs.edit().putString(KEY_STATE, LockStateSerialization.encode(state)).apply()
         // Protection state changed → coalesced Drive snapshot (never throws).
         com.vishal.riy.drive.DriveSync.requestBackup()
+        // The deadline's authoritative change point is also where the system
+        // alarm must be (re)armed. No second timer and no UI involvement.
+        val app = context.applicationContext
+        if (state.lockEndEpochMillis == LockEngine.NO_LOCK) {
+            com.vishal.riy.protection.recovery.RestrictionExpiryScheduler.cancel(app)
+        } else {
+            com.vishal.riy.protection.recovery.RestrictionExpiryScheduler
+                .schedule(app, state.lockEndEpochMillis)
+        }
     }
 
     private companion object {

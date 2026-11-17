@@ -99,6 +99,13 @@ interface DevicePolicyBoundary {
         emptyList()
 
     /**
+     * True when the platform can read the lock-task allowlist back. API < 26
+     * cannot: callers must then verify membership with [isLockTaskPermitted]
+     * instead of treating an empty read-back as a mismatch.
+     */
+    val lockTaskPackagesReadable: Boolean get() = true
+
+    /**
      * Adds the user restriction [restriction] (a `UserManager` key such as
      * `no_install_unknown_sources`, `no_config_private_dns`,
      * `no_config_vpn`). Implements `DevicePolicyManager.addUserRestriction`.

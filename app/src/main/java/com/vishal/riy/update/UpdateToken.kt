@@ -8,8 +8,10 @@ import com.vishal.riy.BuildConfig
  * only (env var / Gradle property / local.properties) — it is never committed,
  * never hard-coded, and never in strings.xml or the AndroidManifest.
  *
- * Security: the field is blank in RELEASE builds, so a production artifact
- * carries no token. Only local DEBUG (test) builds embed it.
+ * Security: the field is blank in RELEASE builds (the default in
+ * `defaultConfig` is empty and only the `debug` build type injects a value),
+ * so a production artifact carries no token. Only local DEBUG (test) builds
+ * embed it.
  */
 object UpdateToken {
 

@@ -83,6 +83,9 @@ android {
         // the Google account is authorized at runtime, never hardcoded).
         buildConfigField("boolean", "REMOTE_BACKUP_ENABLED", "true")
         buildConfigField("String", "DRIVE_FOLDER", "\"RiyBackup\"")
+        // Blank by default: only local DEBUG builds inject a token. A shipped
+        // RELEASE APK must never carry a credential in its DEX.
+        buildConfigField("String", "GITHUB_TOKEN", "\"\"")
     }
 
     signingConfigs {
@@ -122,10 +125,9 @@ android {
         }
         release {
             isMinifyEnabled = false
-            // Release artifacts also carry the token (same local-config mechanism as
-            // debug) so the app can self-update from the PRIVATE GitHub repository.
-            // Injected in CI from the ANDROID_PRIVATE_PAT secret; never hard-coded.
-            buildConfigField("String", "GITHUB_TOKEN", "\"${escapeForJavaString(gitHubToken)}\"")
+            // Release APKs carry NO credential: the blank defaultConfig value is
+            // inherited, so update checks are anonymous. The repo is public; a
+            // private-repo deployment can restore the token at build time only.
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("releaseFallback")
         }

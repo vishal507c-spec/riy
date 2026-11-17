@@ -8,84 +8,59 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 
 /**
- * RIY sci-fi cockpit theme: deep-space hull, neon-cyan holograms, magenta
- * accents, amber warnings. Always dark — a starship bridge has no light mode.
+ * RIY shield-console theme: calm deep-navy surfaces, soft cyan primary, mint
+ * for verified states and amber for anything not yet proven. Always dark.
  *
- * Only colors/typography live here; every protection string, icon and state
- * mapping is untouched (see the zero-confusion contract).
+ * Only colours and typography live here. Every protection string, icon and
+ * state mapping stays in the authoritative presentation code.
  */
 object SciFiColors {
-    /** Hull black. */
-    val Void = Color(0xFF04070D)
-
-    /** Panel surface. */
-    val Hull = Color(0xFF0A1420)
-
-    /** Raised console surface. */
-    val Console = Color(0xFF0E1C2E)
-
-    /** Hologram cyan (primary actions, active states). */
-    val NeonCyan = Color(0xFF00E5FF)
-
-    /** Deep cyan for filled containers. */
-    val CyanDepth = Color(0xFF062B36)
-
-    /** Plasma magenta (escalated states, secondary accents). */
-    val Plasma = Color(0xFFFF3DF0)
-
-    /** Warning amber (transitional states). */
-    val SolarAmber = Color(0xFFFFB300)
-
-    /** Alert red-orange (failures, mismatches). */
-    val AlertRed = Color(0xFFFF4D3D)
-
-    /** Go green (verified states). */
-    val GoGreen = Color(0xFF3DFF88)
-
-    /** Dim telemetry text. */
-    val Telemetry = Color(0xFF7D93A8)
+    val Void = Color(0xFF070B14)
+    val Hull = Color(0xFF0D1524)
+    val Console = Color(0xFF121E31)
+    val NeonCyan = Color(0xFF4DD8E6)
+    val CyanDepth = Color(0xFF10333E)
+    val Plasma = Color(0xFFB169F5)
+    val SolarAmber = Color(0xFFFFC14D)
+    val AlertRed = Color(0xFFFF6B5E)
+    val GoGreen = Color(0xFF4ADE9B)
+    val Telemetry = Color(0xFF93A7BD)
 }
 
-private val SciFiScheme = darkColorScheme(
+private val ShieldScheme = darkColorScheme(
     primary = SciFiColors.NeonCyan,
-    onPrimary = Color(0xFF001318),
+    onPrimary = SciFiColors.Void,
     primaryContainer = SciFiColors.CyanDepth,
     onPrimaryContainer = SciFiColors.NeonCyan,
     secondary = SciFiColors.Plasma,
-    onSecondary = Color(0xFF1B0019),
-    secondaryContainer = Color(0xFF2E0A2C),
+    onSecondary = SciFiColors.Void,
+    secondaryContainer = Color(0xFF221630),
     onSecondaryContainer = SciFiColors.Plasma,
     tertiary = SciFiColors.SolarAmber,
-    onTertiary = Color(0xFF1B1000),
-    tertiaryContainer = Color(0xFF2E1F04),
+    onTertiary = SciFiColors.Void,
+    tertiaryContainer = Color(0xFF2E2210),
     onTertiaryContainer = SciFiColors.SolarAmber,
     background = SciFiColors.Void,
-    onBackground = Color(0xFFE8F4FF),
+    onBackground = Color(0xFFEAF2FA),
     surface = SciFiColors.Hull,
-    onSurface = Color(0xFFE8F4FF),
+    onSurface = Color(0xFFEAF2FA),
     surfaceVariant = SciFiColors.Console,
     onSurfaceVariant = SciFiColors.Telemetry,
     error = SciFiColors.AlertRed,
-    onError = Color(0xFF1B0500),
-    errorContainer = Color(0xFF330D08),
-    onErrorContainer = Color(0xFFFF8A7A),
+    onError = SciFiColors.Void,
+    errorContainer = Color(0xFF351514),
+    onErrorContainer = Color(0xFFFFB4AB),
 )
 
-private val SciFiTypography = Typography().let { base ->
-    val mono = FontFamily.Monospace
+private val ShieldTypography = Typography().let { base ->
     base.copy(
-        displayLarge = base.displayLarge.copy(fontFamily = mono),
-        headlineMedium = base.headlineMedium.copy(fontFamily = mono),
-        titleLarge = base.titleLarge.copy(fontFamily = mono),
-        labelLarge = base.labelLarge.copy(fontFamily = mono, letterSpacing = base.labelLarge.letterSpacing),
+        labelLarge = base.labelLarge.copy(fontFamily = FontFamily.Monospace),
+        labelSmall = base.labelSmall.copy(fontFamily = FontFamily.Monospace),
     )
 }
 
-/**
- * App theme: always the sci-fi cockpit (dark). Reuses the existing Material3
- * DayNight XML theme on the Activity window.
- */
+/** App theme: always the dark shield console. */
 @Composable
 fun RiyTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = SciFiScheme, typography = SciFiTypography, content = content)
+    MaterialTheme(colorScheme = ShieldScheme, typography = ShieldTypography, content = content)
 }

@@ -105,6 +105,13 @@ class AndroidEnforcementEngine(
     /** What the platform is ACTUALLY enforcing right now, read live. */
     override fun currentStatus(): EnforcementStatus {
         if (!isDeviceOwner()) return EnforcementStatus.NORMAL
+        if (!devicePolicy.lockTaskPackagesReadable) {
+            // API < 26 cannot enumerate the allowlist. The last successful
+            // verified apply/reconcile is the only honest evidence available;
+            // per-package membership is checked during verification instead.
+            return if (expected.get()?.session?.state.isRestrictedSession() == true)
+                EnforcementStatus.ACTIVE_RESTRICTED else EnforcementStatus.NORMAL
+        }
         val allowlist = devicePolicy.getLockTaskPackages(adminComponent())
         // A restrictive allowlist exists only while a restriction is applied;
         // the normal policy keeps just RIY (see [normalPolicy]).
@@ -207,7 +214,7 @@ class AndroidEnforcementEngine(
         //    platforms without feature control (pre-API 28) only the allowlist
         //    is verifiable, and that is what is verified here.
         val actual = readPlatformPolicy(admin)
-        val verified = actual.packages == packages.toSet() &&
+        val verified = allowlistMatches(actual, admin, effectivePolicy) &&
             (!devicePolicy.lockTaskFeaturesSupported || actual.features == features)
         if (!verified) {
             recordIssue("Post-apply read-back mismatch (packages or features differ)")
@@ -238,7 +245,7 @@ class AndroidEnforcementEngine(
 
     /** Removes the restriction. Never removes Device Owner or uninstall protection. */
     @Synchronized
-    fun restoreNormalPolicyWithResult(): PolicyApplicationResult {
+    override fun restoreNormalPolicyWithResult(): PolicyApplicationResult {
         if (!isDeviceOwner()) {
             recordIssue("Not Device Owner; normal policy is already in force")
             lastApplicationResult = PolicyApplicationResult.NOT_DEVICE_OWNER
@@ -307,7 +314,9 @@ class AndroidEnforcementEngine(
 
         // 1. Read the ground truth.
         var actual = readPlatformPolicy(admin)
-        var verified = actual.matches(expectedPolicy)
+        var verified = allowlistMatches(actual, admin, expectedPolicy) &&
+            (!devicePolicy.lockTaskFeaturesSupported ||
+                actual.features == LockTaskFeatures.from(expectedPolicy))
 
         // 2. Correct, then re-read. Success is judged on the SECOND read.
         if (!verified) {
@@ -320,7 +329,9 @@ class AndroidEnforcementEngine(
                 devicePolicy.setLockTaskFeatures(admin, LockTaskFeatures.from(expectedPolicy))
             }
             actual = readPlatformPolicy(admin)
-            verified = actual.matches(expectedPolicy)
+            verified = allowlistMatches(actual, admin, expectedPolicy) &&
+                (!devicePolicy.lockTaskFeaturesSupported ||
+                    actual.features == LockTaskFeatures.from(expectedPolicy))
         }
 
         // 3. Package-state reconciliation: a newly installed / unhidden /
@@ -523,6 +534,23 @@ class AndroidEnforcementEngine(
         allowed.forEach { merged += it.packageName }
         policy.allowedPackages.forEach { if (it.isNotBlank()) merged += it }
         return merged.toList()
+    }
+
+    /**
+     * Allowlist read-back that also works below API 26, where
+     * `getLockTaskPackages()` does not exist: there we verify each expected
+     * package with the public `isLockTaskPermitted()` check (API 23+) and rely
+     * on the setter's own boolean result. This stops a permanently-empty
+     * read-back from making reconciliation oscillate forever.
+     */
+    private fun allowlistMatches(
+        actual: PlatformPolicy,
+        admin: AdminComponent,
+        policy: LockTaskPolicy,
+    ): Boolean = if (devicePolicy.lockTaskPackagesReadable) {
+        actual.packages == policy.allowedPackages.toSet()
+    } else {
+        policy.allowedPackages.all { devicePolicy.isLockTaskPermitted(it) }
     }
 
     /** Reads what the platform is ACTUALLY enforcing right now. */

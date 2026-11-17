@@ -126,6 +126,11 @@ class BlockerVpnService : VpnService() {
                 com.vishal.riy.admin.AlwaysOnVpn.clear(this)
                 ProtectionWatchdog.cancel(this)
                 stopFiltering()
+                // Symmetric teardown: policy applied at filter start must be
+                // released on an explicit OFF, not left behind indefinitely.
+                EncryptedDnsPolicy.clear(this)
+                com.vishal.riy.protection.integrity.ProtectionReconciler
+                    .restoreAll(this, "protection_off")
                 android.app.Service.START_NOT_STICKY
             }
             ACTION_START, VpnService.SERVICE_INTERFACE -> {

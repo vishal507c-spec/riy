@@ -181,6 +181,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- System-owned expiry alarm for the 2-hour restriction. Not exported:
+             only our own immutable PendingIntent can fire it. It walks the same
+             reconciler used by boot / foreground / package events. -->
+        <receiver
+            android:name=".protection.recovery.RestrictionExpiryReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.vishal.riy.RESTRICTION_EXPIRED" />
+            </intent-filter>
+        </receiver>
+
         <!-- FileProvider used to hand the downloaded, verified update APK to the
              system package installer. The file lives in app-private storage
              (no world-readable files, no broad storage permission). -->
