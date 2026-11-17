@@ -188,6 +188,21 @@
     <string name="tracker_saved">Saved</string>
     <string name="tracker_legend">Green = NO · Amber = YES · Grey = not recorded or unknown. Tap a date to edit it.</string>
 
+    <!-- Tracker insights: honest counts only, never scores or health claims. -->
+    <string name="tracker_insight_week_no">NO days this week</string>
+    <string name="tracker_insight_answered">Days answered (last 14)</string>
+    <string name="tracker_insight_best_run">Best run (last 14 days)</string>
+    <string name="tracker_insight_current">Current run</string>
+    <string name="tracker_insight_longest">Best run ever</string>
+    <string name="tracker_insight_recorded">Days recorded</string>
+    <string name="tracker_insight_since_yes">Days since last YES</string>
+    <string name="tracker_insight_since_no">Days since last NO</string>
+    <string name="tracker_insight_milestone">Days to next milestone</string>
+    <string name="tracker_insight_today">Today</string>
+    <string name="tracker_insights_title">Insights</string>
+    <string name="tracker_week_title">Last 7 days</string>
+    <string name="tracker_pattern_title">Last 14 days</string>
+
     <string name="tracker_greeting">Good Morning!</string>
     <string name="tracker_question">Kal masturbation kiya tha?</string>
     <string name="tracker_date_hint">Date being recorded</string>

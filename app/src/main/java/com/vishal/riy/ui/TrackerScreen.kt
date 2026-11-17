@@ -12,11 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,26 +30,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.vishal.riy.R
+import com.vishal.riy.tracker.InsightTone
 import com.vishal.riy.tracker.TrackerCalendarDay
 import com.vishal.riy.tracker.TrackerDates
+import com.vishal.riy.tracker.TrackerInsights
 import com.vishal.riy.tracker.TrackerStatus
 import com.vishal.riy.tracker.TrackerUiState
 import java.util.Locale
 import java.util.TimeZone
 
 /**
- * The Daily Tracker screen.
- *
- * Purely presentational: every number comes from [TrackerUiState], which is
- * derived from what is actually stored. There are no sample values, no
- * placeholders dressed as data, and no level/XP/progress-bar decoration — the
- * brief explicitly rules those out, and invented encouragement would be
- * misinformation about the user's own history.
- *
- * Colour meaning, kept consistent everywhere in this feature:
- *   green = NO (a confirmed "no" day), amber = YES, grey = not recorded/unknown.
+ * Daily Tracker — a calm, data-honest screen. Every number comes from
+ * [TrackerUiState]; nothing is sampled or invented. Green = NO, amber = YES,
+ * grey = not recorded.
  */
 @Composable
 fun TrackerScreen(
@@ -57,12 +53,12 @@ fun TrackerScreen(
     onBack: () -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-onDayClick: (Long) -> Unit,
+    onDayClick: (Long) -> Unit,
     onConfirmationShown: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     SciFiFrame(
-        header = "R.I.Y. // DAILY TRACKER",
+        header = "RIY // DAILY TRACKER",
         headerColor = SciFiColors.GoGreen,
         modifier = modifier,
     ) {
@@ -70,78 +66,84 @@ onDayClick: (Long) -> Unit,
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = AppUI.ScreenPadding, vertical = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(AppUI.SectionGap),
         ) {
-            Text(
-                text = stringResource(R.string.tracker_title),
-                style = typography.headlineMedium,
-                color = colorScheme.onBackground,
+            AppHeader(
+                title = stringResource(R.string.tracker_title),
+                subtitle = stringResource(R.string.tracker_entry_subtitle),
+                trailing = {
+                    Text(
+                        text = "‹",
+                        style = typography.headlineMedium,
+                        color = colorScheme.primary,
+                        modifier = Modifier
+                            .clickable(onClick = onBack)
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
+                },
             )
+
             Text(
                 text = stringResource(R.string.tracker_subtitle),
                 style = typography.bodyMedium,
                 color = colorScheme.onSurfaceVariant,
             )
 
-            // Small, non-blocking save confirmation.
             state.savedConfirmation?.let {
                 LaunchedEffect(it) {
                     kotlinx.coroutines.delay(2_500)
                     onConfirmationShown()
                 }
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = SciFiColors.GoGreen.copy(alpha = 0.15f),
-                    ),
-                ) {
+                SectionCard(container = SciFiColors.GoGreen.copy(alpha = 0.14f)) {
                     Text(
                         text = stringResource(R.string.tracker_saved),
-                        style = typography.titleMedium,
+                        style = typography.titleSmall,
                         color = SciFiColors.GoGreen,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
             }
 
-StatCard(
-                label = stringResource(R.string.tracker_stat_yes_days),
-                hint = stringResource(R.string.tracker_hint_yes),
-                value = state.stats.yesDays,
-                accent = SciFiColors.SolarAmber,
-            )
-            StatCard(
-                label = stringResource(R.string.tracker_stat_no_days),
-                hint = stringResource(R.string.tracker_hint_no),
-                value = state.stats.noDays,
-                accent = SciFiColors.GoGreen,
-            )
-            StatCard(
-                label = stringResource(R.string.tracker_stat_current_streak),
-                hint = stringResource(R.string.tracker_hint_current_streak),
-                value = state.stats.currentStreak,
-                accent = SciFiColors.NeonCyan,
-            )
-            StatCard(
-                label = stringResource(R.string.tracker_stat_longest_streak),
-                hint = stringResource(R.string.tracker_hint_longest_streak),
-                value = state.stats.longestStreak,
-                accent = SciFiColors.NeonCyan,
-            )
+            // Four real numbers in a balanced 2x2 grid.
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    MetricTile(
+                        label = stringResource(R.string.tracker_stat_no_days),
+                        value = state.stats.noDays,
+                        caption = stringResource(R.string.tracker_hint_no),
+                        accent = SciFiColors.GoGreen,
+                    )
+                    MetricTile(
+                        label = stringResource(R.string.tracker_stat_current_streak),
+                        value = state.stats.currentStreak,
+                        caption = stringResource(R.string.tracker_hint_current_streak),
+                        accent = SciFiColors.NeonCyan,
+                    )
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    MetricTile(
+                        label = stringResource(R.string.tracker_stat_yes_days),
+                        value = state.stats.yesDays,
+                        caption = stringResource(R.string.tracker_hint_yes),
+                        accent = SciFiColors.SolarAmber,
+                    )
+                    MetricTile(
+                        label = stringResource(R.string.tracker_stat_longest_streak),
+                        value = state.stats.longestStreak,
+                        caption = stringResource(R.string.tracker_hint_longest_streak),
+                        accent = SciFiColors.NeonCyan,
+                    )
+                }
+            }
 
-            // THE "is my data actually saved?" line. Without this the screen
-            // looks identical whether nothing has been recorded or a year has
-            // been tracked, which is exactly what made it unreadable.
             TrackerStatusLine(state)
+
+            WeekAndInsights(state)
 
             if (state.stats.unrecordedDays > 0) {
                 Text(
-                    text = stringResource(
-                        R.string.tracker_unrecorded_note,
-                        state.stats.unrecordedDays,
-                    ),
+                    text = stringResource(R.string.tracker_unrecorded_note, state.stats.unrecordedDays),
                     style = typography.bodySmall,
                     color = colorScheme.onSurfaceVariant,
                 )
@@ -159,69 +161,10 @@ StatCard(
                 style = typography.bodySmall,
                 color = colorScheme.onSurfaceVariant,
             )
-
-            Text(
-                text = stringResource(R.string.tracker_back),
-                style = typography.labelLarge,
-                color = colorScheme.primary,
-                modifier = Modifier
-                    .padding(top = 8.dp)
-                    .clickable(onClick = onBack),
-            )
         }
     }
 }
 
-@Composable
-private fun StatCard(label: String, hint: String, value: Int, accent: Color) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = typography.labelLarge,
-                    color = colorScheme.onSurface,
-                )
-                Text(
-                    // A plain sentence explaining what the number counts, so the
-                    // figure never has to be interpreted by guesswork.
-                    text = hint,
-                    style = typography.bodySmall,
-                    color = colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.size(12.dp))
-            Text(
-                // Real persisted value, or an honest 0. Never a sample figure.
-                text = value.toString(),
-                style = typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = accent,
-            )
-            Spacer(Modifier.size(4.dp))
-            Text(
-                text = stringResource(R.string.tracker_unit_days),
-                style = typography.bodySmall,
-                color = colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/**
- * The honest "what is stored right now" line: how many days have an entry,
- * when the most recent one was, and since when tracking exists. This is the
- * answer to "is my data actually being saved?".
- */
 @Composable
 private fun TrackerStatusLine(state: TrackerUiState) {
     val stats = state.stats
@@ -235,23 +178,9 @@ private fun TrackerStatusLine(state: TrackerUiState) {
         )
         else -> stringResource(R.string.tracker_status_empty)
     }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (stats.recordedDays == 0) {
-                colorScheme.surfaceVariant
-            } else {
-                SciFiColors.GoGreen.copy(alpha = 0.12f)
-            },
-        ),
-    ) {
-        Text(
-            text = text,
-            style = typography.bodyMedium,
-            color = colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-        )
+    SectionCard(container = if (stats.recordedDays == 0) colorScheme.surfaceVariant
+    else SciFiColors.GoGreen.copy(alpha = 0.12f)) {
+        Text(text = text, style = typography.bodyMedium, color = colorScheme.onSurface)
     }
 }
 
@@ -262,80 +191,43 @@ private fun CalendarSection(
     onNextMonth: () -> Unit,
     onDayClick: (Long) -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+    SectionCard {
+        SectionLabel(stringResource(R.string.tracker_calendar_header))
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = stringResource(R.string.tracker_calendar_header),
-                style = typography.labelLarge,
-                color = colorScheme.onSurfaceVariant,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Text(text = monthLabel(state.monthAnchor), style = typography.titleLarge, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NavArrow("<", onPreviousMonth)
+                NavArrow(">", onNextMonth)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth()) {
+            listOf("S", "M", "T", "W", "T", "F", "S").forEach { label ->
                 Text(
-                    text = monthLabel(state.monthAnchor),
-                    style = typography.titleLarge,
-                    color = colorScheme.onSurface,
+                    text = label,
+                    style = typography.bodySmall,
+                    color = colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                    Text(
-                        text = "<",
-                        style = typography.titleLarge,
-                        color = colorScheme.primary,
-                        modifier = Modifier
-                            .clickable(onClick = onPreviousMonth)
-                            .padding(horizontal = 4.dp),
-                    )
-                    Text(
-                        text = ">",
-                        style = typography.titleLarge,
-                        color = colorScheme.primary,
-                        modifier = Modifier
-                            .clickable(onClick = onNextMonth)
-                            .padding(horizontal = 4.dp),
-                    )
-                }
             }
-
+        }
+        Spacer(Modifier.height(6.dp))
+        val cells: List<TrackerCalendarDay?> =
+            List<TrackerCalendarDay?>(state.leadingBlanks) { null } + state.days
+        val padded = cells + List((WEEK_SIZE - cells.size % WEEK_SIZE) % WEEK_SIZE) { null }
+        padded.chunked(WEEK_SIZE).forEach { week ->
             Row(Modifier.fillMaxWidth()) {
-                listOf("S", "M", "T", "W", "T", "F", "S").forEach { label ->
-                    Text(
-                        text = label,
-                        style = typography.bodySmall,
-                        color = colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-
-            // Compose lays a Row's children out side by side, so the month is
-            // emitted as explicit week rows. Each cell takes an equal weight,
-            // which is what keeps 1..31 aligned under the weekday headers.
-            val cells: List<TrackerCalendarDay?> =
-                List<TrackerCalendarDay?>(state.leadingBlanks) { null } + state.days
-            val padded = cells + List((WEEK_SIZE - cells.size % WEEK_SIZE) % WEEK_SIZE) { null }
-            padded.chunked(WEEK_SIZE).forEach { week ->
-                Row(Modifier.fillMaxWidth()) {
-                    week.forEach { day ->
-                        if (day == null) {
-                            Box(
-                                Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f),
-                            )
-                        } else {
-                            DayCell(day = day, onClick = { onDayClick(day.epochDay) })
-                        }
+                week.forEach { day ->
+                    if (day == null) {
+                        Box(Modifier.weight(1f).aspectRatio(1f))
+                    } else {
+                        DayCell(day = day, onClick = { onDayClick(day.epochDay) })
                     }
                 }
             }
@@ -343,22 +235,34 @@ private fun CalendarSection(
     }
 }
 
+@Composable
+private fun NavArrow(symbol: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .clickable(onClick = onClick)
+            .background(colorScheme.primaryContainer, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = symbol, style = typography.titleMedium, color = colorScheme.primary)
+    }
+}
+
 private const val WEEK_SIZE = 7
 
-/** A RowScope extension so the cell can take an equal share of the week row. */
 @Composable
 private fun RowScope.DayCell(day: TrackerCalendarDay, onClick: () -> Unit) {
     val (tint, border) = when (day.status) {
         TrackerStatus.NO -> SciFiColors.GoGreen to SciFiColors.GoGreen
         TrackerStatus.YES -> SciFiColors.SolarAmber to SciFiColors.SolarAmber
-        TrackerStatus.UNKNOWN -> Color(0xFF5A6B7A) to Color(0xFF5A6B7A)
+        TrackerStatus.UNKNOWN -> SciFiColors.Telemetry to SciFiColors.Telemetry
         null -> Color(0xFF16232F) to Color(0xFF1E3242)
     }
     Box(
         modifier = Modifier
             .weight(1f)
             .aspectRatio(1f)
-            .padding(2.dp)
+            .padding(3.dp)
             .background(tint.copy(alpha = if (day.status == null) 0.55f else 0.20f), CircleShape)
             .border(1.dp, border.copy(alpha = 0.8f), CircleShape)
             .clickable(onClick = onClick),
@@ -374,14 +278,87 @@ private fun RowScope.DayCell(day: TrackerCalendarDay, onClick: () -> Unit) {
 }
 
 private fun dayOfMonthLabel(epochDay: Long): String =
-    com.vishal.riy.tracker.TrackerDates.civilFromDays(epochDay).third.toString()
+    TrackerDates.civilFromDays(epochDay).third.toString()
+
+@Composable
+private fun WeekAndInsights(state: TrackerUiState) {
+    val recent = state.recentStatuses
+    SectionCard {
+        SectionLabel(stringResource(R.string.tracker_insights_title))
+        Spacer(Modifier.height(12.dp))
+
+        if (recent.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.tracker_week_title),
+                style = typography.labelSmall,
+                color = colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            StatusRibbon(recent.takeLast(7))
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.tracker_pattern_title),
+                style = typography.labelSmall,
+                color = colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            StatusRibbon(recent)
+            Spacer(Modifier.height(14.dp))
+        }
+
+        val insights = TrackerInsights.all(state.stats, recent, state.todayStatus)
+        insights.chunked(2).forEach { pair ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                pair.forEach { insight ->
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(insight.labelRes),
+                            style = typography.labelSmall,
+                            color = colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = insight.value,
+                            style = typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = when (insight.tone) {
+                                InsightTone.GOOD -> SciFiColors.GoGreen
+                                InsightTone.NEUTRAL -> SciFiColors.SolarAmber
+                                InsightTone.QUIET -> colorScheme.onSurface
+                            },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusRibbon(statuses: List<TrackerStatus?>) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        statuses.forEach { status ->
+            val color = when (status) {
+                TrackerStatus.NO -> SciFiColors.GoGreen
+                TrackerStatus.YES -> SciFiColors.SolarAmber
+                TrackerStatus.UNKNOWN -> SciFiColors.Telemetry
+                null -> colorScheme.surface
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(color.copy(alpha = if (status == null) 1f else 0.55f), CircleShape)
+                    .height(10.dp),
+            )
+        }
+    }
+}
 
 private fun monthLabel(epochDay: Long): String {
-    val (year, month, _) = com.vishal.riy.tracker.TrackerDates.civilFromDays(epochDay)
-    val name = java.text.DateFormatSymbols(Locale.US)
-        .getShortMonths()
-        .getOrNull(month - 1)
-        .orEmpty()
-        .uppercase(Locale.US)
-    return "$name $year"
+    val (year, month, _) = TrackerDates.civilFromDays(epochDay)
+    val name = java.text.DateFormatSymbols(Locale.US).getShortMonths().getOrNull(month - 1).orEmpty()
+    return "$name $year".uppercase(Locale.US)
 }

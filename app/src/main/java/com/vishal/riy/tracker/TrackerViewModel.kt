@@ -29,6 +29,10 @@ data class TrackerUiState(
     val showCheckIn: Boolean = false,
     val checkInDate: Long? = null,
     val savedConfirmation: String? = null,
+    /** Last 14 completed days (index 0 = 13 days ago, last = yesterday). */
+    val recentStatuses: List<TrackerStatus?> = emptyList(),
+    /** Today's answer, or null while today is still unanswered. */
+    val todayStatus: TrackerStatus? = null,
 ) {
     val isEmpty: Boolean get() = stats.recordedDays == 0 && stats.trackingStartDay == null
 }
@@ -85,6 +89,8 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
             showCheckIn = showCheckIn,
             checkInDate = checkInDate,
             savedConfirmation = confirmation,
+            recentStatuses = (13 downTo 1).map { offset -> byDay[today - offset]?.status },
+            todayStatus = byDay[today]?.status,
         )
     }
 

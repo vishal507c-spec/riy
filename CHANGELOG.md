@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.1.0 - 2026-11-17
+- Full enterprise-style UI: one design system across dashboard, lock screen, tracker, check-in and navigation; standard bottom navigation; calm Material 3 surfaces.
+- Ten honest tracker insights: 7-day and 14-day ribbons, NO days this week, answered days, best recent run, current/best-ever run, recorded days, days since last YES/NO, next milestone and today's status. All are counts of real answers — no estimates, scores, percentages or health claims.
+- All prior safety invariants preserved.
+
 ## v3.0.0 - 2026-11-17
 - Full dashboard redesign: a calm shield console with a new brand header, a breathing status hero, a single readable status card, quick truthful fact cards, a clear tracker entry, and softer rounded Material 3 surfaces. Refreshed colour palette and typography.
 - All prior state-truthfulness rules are preserved: only a verified filter is painted green, the single authoritative shield status drives every surface, and the one enable action stays gated behind system VPN consent.

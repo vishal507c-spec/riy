@@ -298,6 +298,7 @@ fun ShieldLayersSection(state: ProtectionUiState) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = AppUI.CardRadius,
         colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
     ) {
         Column(
