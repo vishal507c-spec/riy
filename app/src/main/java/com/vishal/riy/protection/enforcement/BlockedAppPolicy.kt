@@ -67,9 +67,8 @@ object BlockedAppPolicy {
 
     // ------------------------------------------------------------ WHATSAPP
     // Explicit EXEMPTION from package-level neutralization (hide/suspend).
-    // WhatsApp stays a NORMAL, launchable app: RIY only blocks its Status /
-    // Updates surface through the accessibility filter. The generic hardening
-    // sweep and the single-package install path must therefore never hide or
+    // WhatsApp stays a NORMAL, launchable app. The generic hardening sweep
+    // and the single-package install path must therefore never hide or
     // suspend it, even though it is absent from the lock-task allowlist.
 
     /** WhatsApp's package identity — never hidden or suspended by RIY. */

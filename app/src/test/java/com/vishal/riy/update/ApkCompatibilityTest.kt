@@ -46,7 +46,7 @@ class ApkCompatibilityTest {
         ).adbCommand!!
 
         // -r replaces the package WITHOUT uninstalling it, which is exactly
-        // what preserves preferences, blocker config and accessibility state.
+        // what preserves preferences and blocker config.
         assertTrue("must use -r", command.contains("install -r"))
         assertFalse("must never uninstall", command.contains("uninstall"))
         assertFalse("must never clear data", command.contains("pm clear"))

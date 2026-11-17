@@ -94,10 +94,10 @@ object ProtectionReconciler {
                 Log.i(TAG, "$reason for RIY itself — verifying only")
                 return
             }
-            // WhatsApp is never hidden/suspended: only its Status/Updates
-            // surface is filtered by the accessibility blocker. Keep every
-            // package-event path inert for it (defense in depth on top of the
-            // enforcement engine's own exemption).
+            // WhatsApp is never hidden/suspended: it must stay a normal,
+            // launchable app. Keep every package-event path inert for it
+            // (defense in depth on top of the enforcement engine's own
+            // exemption).
             if (BlockedAppPolicy.isSuspensionExemptPackage(packageName)) {
                 Log.i(TAG, "$reason for WhatsApp — package neutralization skipped")
                 return

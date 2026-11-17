@@ -176,11 +176,6 @@ PrimaryStatusCard(state, blockerStatus)
         //     reachable immediately instead of being buried further down.
         TrackerEntryRow(onOpen = onOpenTracker)
 
-        // 4b. The WhatsApp Status guard — the app's primary feature card.
-        //     Rendered straight after the primary status so it reads as the
-        //     headline capability, without disturbing anything below it.
-        WhatsAppStatusSection()
-
         // 5. Optional Protection Details, in normal language.
         ProtectionDetailsCard(state)
 

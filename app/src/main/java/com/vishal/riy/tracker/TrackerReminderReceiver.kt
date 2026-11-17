@@ -10,9 +10,9 @@ import java.util.TimeZone
  * Receives the morning alarm and the system broadcasts that invalidate its
  * timing, then keeps the reminder correct without ever opening a UI.
  *
- * Deliberately does NOT use an AccessibilityService, does NOT launch an activity
- * from the background, and does NOT use a full-screen intent. Android has
- * restricted all three since Android 10 and the brief forbids abusing them.
+ * Deliberately does NOT launch an activity from the background and does NOT
+ * use a full-screen intent. Android has restricted both since Android 10
+ * and the brief forbids abusing them.
  * The reminder's job is to notify; the user opens the app, and the in-app
  * check-in is the reliable path when the notification is missed.
  */

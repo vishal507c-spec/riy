@@ -639,11 +639,11 @@ class AndroidEnforcementEngine(
                 )
             }
             // WhatsApp is deliberately EXEMPT from package neutralization: it
-            // must stay launchable and only its Status/Updates surface is
-            // filtered. An older build could have suspended it through the
-            // sweep above, and no other component clears that platform state,
-            // so repair a stale suspension on every apply/reconcile pass. This
-            // is idempotent: a healthy device performs no write.
+            // must stay launchable. An older build could have suspended it
+            // through the sweep above, and no other component clears that
+            // platform state, so repair a stale suspension on every
+            // apply/reconcile pass. This is idempotent: a healthy device
+            // performs no write.
             if (installed.any { it.packageName == BlockedAppPolicy.WHATSAPP_PACKAGE }) {
                 val whatsApp = listOf(BlockedAppPolicy.WHATSAPP_PACKAGE)
                 if (devicePolicy.getSuspendedPackages(admin, whatsApp).isNotEmpty()) {
@@ -741,8 +741,8 @@ class AndroidEnforcementEngine(
     fun hardenSinglePackage(packageName: String): Boolean {
         if (packageName.isBlank()) return true
         if (BlockedAppPolicy.isSelfPackage(packageName, riyPackageName)) return true
-        // WhatsApp is never hidden/suspended by RIY. Its Status/Updates surface
-        // is governed by the accessibility blocker, not package neutralization.
+        // WhatsApp is never hidden/suspended by RIY: it stays a normal,
+        // launchable app and is exempt from package neutralization.
         if (BlockedAppPolicy.isSuspensionExemptPackage(packageName)) return true
         if (!isDeviceOwner()) return false
         val expectation = expected.get()
