@@ -203,6 +203,30 @@
     <string name="tracker_week_title">Last 7 days</string>
     <string name="tracker_pattern_title">Last 14 days</string>
 
+    <!-- Today card: one place to answer today, no calendar hunt needed. -->
+    <string name="tracker_today_label">TODAY</string>
+    <string name="tracker_today_pending">No entry yet — tap an answer</string>
+    <string name="tracker_today_recorded">Recorded as</string>
+    <string name="tracker_trend_title">Last 15 days</string>
+    <string name="tracker_streak_breakdown_title">Streaks</string>
+    <string name="tracker_streak_breakdown_body">Current run: %1$d · Longest run ever: %2$d</string>
+    <string name="tracker_streak_freeze">Freeze streak</string>
+    <string name="tracker_streak_freeze_desc">Pause the current-run display. Turn off to resume counting.</string>
+    <string name="tracker_streak_frozen_note">Streak frozen at %1$d day(s) — turn off to resume counting.</string>
+    <string name="tracker_daily_note">Daily note</string>
+    <string name="tracker_daily_note_hint">Optional private note for this day — never counted anywhere</string>
+    <string name="tracker_bulk_mark">Mark all of this month</string>
+    <string name="tracker_bulk_mark_confirm">Mark every day of this month as %1$s? Existing entries for that day are replaced.</string>
+    <string name="tracker_bulk_clear">Clear this month</string>
+    <string name="tracker_bulk_clear_confirm">Delete every entry of this month? This cannot be undone.</string>
+    <string name="tracker_undo_last">Undo</string>
+    <string name="tracker_reminder_settings">Reminder</string>
+    <string name="tracker_reminder_time">Reminder time</string>
+    <string name="tracker_reminder_enabled">Daily check-in reminder</string>
+    <string name="tracker_export_csv">Export CSV</string>
+    <string name="tracker_export_hint">Share your tracker data as a CSV file</string>
+    <string name="tracker_export_failed">Export is not available right now</string>
+
     <string name="tracker_greeting">Good Morning!</string>
     <string name="tracker_question">Kal masturbation kiya tha?</string>
     <string name="tracker_date_hint">Date being recorded</string>

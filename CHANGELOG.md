@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.4.0 - 2026-11-25
+- Tracker UX rebuilt for lower cognitive load: a "Today" hero card answers the day in one tap without hunting through the calendar, one 15-day trend chart replaces the text ribbons, streak facts sit in a single card, settings (reminder + export) are parked at the bottom so they never interrupt logging, and destructive actions sit behind a confirmation dialog.
+- Ten new tracker features: Today quick-answer card, 15-day trend chart, streak-freeze toggle (display pause only — counts are never inflated), per-day private notes (journal field in the check-in, dot marker on the calendar), mark-all-of-this-month bulk action (NO/YES/NOT SURE, confirmed), clear-this-month bulk delete (confirmed), 5-second undo of the last save, in-app reminder settings (enable + HH:MM stepper that re-arms the existing alarm), streak breakdown card, and CSV export through the system share sheet (nothing leaves the device unless the user picks a receiving app).
+- Persistence unchanged: notes ride in the existing tracker payload (codec v2, v1 payloads still decode) and every write still flows through the single Drive snapshot path — no second database, no second backup.
+- All numbers stay honest: streaks freeze only the display, notes and bulk actions never fabricate answers, and unrecorded days are still never counted as NO.
+
+## v3.3.0 - 2026-11-17
+- Final safety pass for release: encrypted-DNS inspection, SafeSearch pinning, lock-store hardening, package-state watcher and protection-state store tightened; UI truthfulness tests updated.
+
 ## v3.2.0 - 2026-11-17
 - Invariants are now enforced at build time (`InvariantEnforcementTest`): no accessibility service, no removed guard symbols, no token in release, and the invariant document must stay complete.
 - Self-test validates DNS transaction ID and QR flag before trusting a reply; dedup is clock-skew safe; update checks refuse authenticated redirects; unknown version codes fail closed; version-tag stripping matches Gradle.

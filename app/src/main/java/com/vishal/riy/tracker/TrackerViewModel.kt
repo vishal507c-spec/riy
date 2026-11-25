@@ -1,6 +1,7 @@
 package com.vishal.riy.tracker
 
 import android.app.Application
+import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +15,12 @@ data class TrackerCalendarDay(
     val status: TrackerStatus?,
     /** True when this day is today and therefore still in progress. */
     val isToday: Boolean,
-)
+    /** Free-text note attached to this day, or null. */
+    val note: String? = null,
+) {
+    /** True when a free-text note is attached to this day. */
+    val hasNote: Boolean get() = note != null
+}
 
 /** Everything the tracker screen renders. Derived, never invented. */
 data class TrackerUiState(
@@ -51,6 +57,10 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<TrackerUiState> = _state.asStateFlow()
 
+    /** Undo window state for the short-lived "undo last save" action. */
+    private var undoPending: Pair<Long, TrackerDay?>? = null
+    private var undoExpiresAt = 0L
+
     private fun initialState(): TrackerUiState {
         val now = System.currentTimeMillis()
         val today = TrackerDates.today(now, TimeZone.getDefault())
@@ -67,7 +77,7 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
         val tz = TimeZone.getDefault()
         val today = TrackerDates.today(now, tz)
         val records = store.all()
-        val stats = TrackerCalculator.compute(records, today)
+        val stats = TrackerCalculator.compute(records, today, store.streakFreeze)
         val anchor = _state.value.monthAnchor.takeIf { it != 0L } ?: today
         val monthStart = TrackerDates.firstOfMonth(anchor)
         val monthLength = TrackerDates.lengthOfMonth(anchor)
@@ -82,6 +92,7 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
                     epochDay = day,
                     status = byDay[day]?.status,
                     isToday = day == today,
+                    note = byDay[day]?.note,
                 )
             },
             leadingBlanks = TrackerDates.dayOfWeek(monthStart, tz) - 1,
@@ -139,10 +150,14 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
      * today. The record is written synchronously to local storage first, which
      * is what makes the save work with no internet at all.
      */
-    fun save(epochDay: Long, status: TrackerStatus): Boolean {
+    fun save(epochDay: Long, status: TrackerStatus, note: String? = null): Boolean {
         return runCatching {
             val now = System.currentTimeMillis()
-            store.save(epochDay, status, now)
+            // Undo window: remember the pre-edit record so the user can
+            // rewind the last save without touching anything else.
+            undoPending = epochDay to store.find(epochDay)
+            undoExpiresAt = now + UNDO_WINDOW_MS
+            store.save(epochDay, status, now, note)
             // Local write is done; Drive backup was requested by the store and
             // queues itself if offline. Success of the CLOUD upload is never
             // claimed here — only the local save.
@@ -155,6 +170,159 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
             )
             true
         }.getOrElse { false }
+    }
+
+    /**
+     * Rewinds the most recent [save] when it is still inside the short undo
+     * window. Restoring a previously-absent day deletes it again; restoring
+     * a previous status writes it back. Returns false when there is nothing
+     * (or nothing recent) to undo.
+     */
+    fun undoLast(): Boolean {
+        val pending = undoPending ?: return false
+        if (System.currentTimeMillis() > undoExpiresAt) {
+            undoPending = null
+            return false
+        }
+        undoPending = null
+        val (day, previous) = pending
+        runCatching {
+            if (previous == null) {
+                store.delete(day)
+            } else {
+                store.save(day, previous.status, System.currentTimeMillis(), previous.note)
+            }
+        }.onSuccess {
+            refresh()
+            return true
+        }
+        return false
+    }
+
+    /** Sets today's answer directly from the Today card (null clears it). */
+    fun setToday(status: TrackerStatus?) {
+        val today = TrackerDates.today(System.currentTimeMillis(), TimeZone.getDefault())
+        if (status == null) {
+            runCatching { store.delete(today) }
+        } else {
+            save(today, status)
+        }
+        refresh()
+    }
+
+    /**
+     * Feature: Streak freeze. Enabling keeps the dashboard's current run
+     * visible; disabling resumes counting from real records.
+     */
+    fun setStreakFreeze(value: Boolean) {
+        store.streakFreeze = value
+        refresh()
+    }
+
+    /**
+     * Feature: Daily note. Attaches or clears a free-text note on a day.
+     * Notes never touch the status or the counts.
+     */
+    fun note(epochDay: Long, text: String?) {
+        runCatching {
+            store.saveNote(epochDay, text, System.currentTimeMillis())
+        }.onSuccess { refresh() }
+    }
+
+    /**
+     * Feature: Mark every day of the displayed month with [status]
+     * (used by the "Mark all of this month" bulk action).
+     */
+    fun bulkMarkMonth(status: TrackerStatus, monthAnchor: Long = _state.value.monthAnchor) {
+        runCatching {
+            val days = monthDays(monthAnchor)
+            store.bulkSave(days, status, System.currentTimeMillis())
+            refresh()
+        }.onSuccess {
+            undoPending = null
+        }
+    }
+
+    /**
+     * Feature: Clear every record of the displayed month (bulk delete).
+     * Returns how many days were removed; -1 when the month had none.
+     */
+    fun clearMonth(monthAnchor: Long = _state.value.monthAnchor): Int {
+        val deleted = runCatching { store.clearMonth(TrackerDates.firstOfMonth(monthAnchor), TrackerDates.lengthOfMonth(monthAnchor)) }.getOrDefault(-1)
+        if (deleted > 0) {
+            undoPending = null
+            refresh()
+        }
+        return deleted
+    }
+
+    /**
+     * Reminder settings, mirrored for the tracker screen. Re-arms the
+     * existing alarm when enabled.
+     */
+    var reminderEnabled: Boolean
+        get() = store.reminderEnabled
+        set(value) {
+            store.reminderEnabled = value
+            TrackerReminder.rescheduleFromPreferences(getApplication())
+        }
+
+    var reminderHour: Int
+        get() = store.reminderHour
+        set(value) {
+            store.reminderHour = value
+            TrackerReminder.rescheduleFromPreferences(getApplication())
+        }
+
+    var reminderMinute: Int
+        get() = store.reminderMinute
+        set(value) {
+            store.reminderMinute = value
+            TrackerReminder.rescheduleFromPreferences(getApplication())
+        }
+
+    /**
+     * Trend data for the monthly trend chart: statuses for the last [days]
+     * calendar days, oldest first, chronologically ordered.
+     */
+    fun trendData(days: Int = 30): List<TrackerStatus?> {
+        val today = TrackerDates.today(System.currentTimeMillis(), TimeZone.getDefault())
+        val byDay = store.all().associateBy { it.epochDay }
+        return (0 until days).map { today - it }.reversed().map { byDay[it]?.status }
+    }
+
+    /**
+     * Feature: Export CSV. Shares the full history as CSV through the system
+     * share sheet. Nothing is written to shared storage and nothing leaves the
+     * device unless the user picks an app that receives it.
+     */
+    fun exportCsv(): Boolean = runCatching {
+        val app = getApplication<Application>()
+        val records = store.all().sortedBy { it.epochDay }
+        val csv = buildString {
+            append("epochDay,status,createdAt,updatedAt,note\n")
+            records.forEach { record ->
+                append(record.epochDay).append(',')
+                append(record.status.name).append(',')
+                append(record.createdAt).append(',')
+                append(record.updatedAt).append(',')
+                append(record.note.orEmpty().replace(",", " ").replace("\n", " "))
+                append('\n')
+            }
+        }
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/csv"
+            putExtra(Intent.EXTRA_TEXT, csv)
+        }
+        val chooser = Intent.createChooser(send, "RIY — tracker export")
+        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        app.startActivity(chooser)
+        true
+    }.getOrElse { false }
+
+    private fun monthDays(monthAnchor: Long): List<Long> {
+        val first = TrackerDates.firstOfMonth(monthAnchor)
+        return (0 until TrackerDates.lengthOfMonth(monthAnchor)).map { first + it }
     }
 
     fun delete(epochDay: Long) {
@@ -191,5 +359,9 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
             checkInDate = null,
         )
         refresh(keepEditing, keepCheckIn, keepCheckInDate)
+    }
+
+    private companion object {
+        const val UNDO_WINDOW_MS = 5_000L
     }
 }

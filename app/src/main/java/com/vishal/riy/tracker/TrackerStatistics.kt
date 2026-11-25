@@ -23,6 +23,15 @@ data class TrackerStats(
     val trackingStartDay: Long?,
     /** Most recent recorded date, or null. */
     val latestRecordedDay: Long?,
+    /**
+     * Streak freeze: when [streakFrozen] is true this holds the current run
+     * length as of the last computation, so the dashboard can keep showing it
+     * instead of dropping to zero. It is display metadata only — nothing in
+     * the calculation trusts it as a fact, it never inflates [currentStreak],
+     * and unfreezing resumes counting for real.
+     */
+    val frozenStreak: Int = 0,
+    val streakFrozen: Boolean = false,
 ) {
     /** Total days carrying any answer (YES + NO + UNKNOWN). */
     val recordedDays: Int get() = yesDays + noDays + unknownDays
@@ -69,6 +78,7 @@ object TrackerCalculator {
     fun compute(
         records: List<TrackerDay>,
         todayEpochDay: Long,
+        streakFrozen: Boolean = false,
     ): TrackerStats {
         // Last write wins per date: this makes the calculation independent of
         // the order the caller happens to supply records in, and guarantees one
@@ -80,7 +90,10 @@ object TrackerCalculator {
                 byDay[record.epochDay] = record
             }
         }
-        if (byDay.isEmpty()) return TrackerStats.EMPTY
+        if (byDay.isEmpty()) {
+            // Still surface the freeze state honestly, with zero counts.
+            return TrackerStats.EMPTY.copy(streakFrozen = streakFrozen)
+        }
 
         val yes = byDay.values.count { it.status == TrackerStatus.YES }
         val no = byDay.values.count { it.status == TrackerStatus.NO }
@@ -105,6 +118,8 @@ object TrackerCalculator {
             longestStreak = longest,
             trackingStartDay = start,
             latestRecordedDay = latest,
+            frozenStreak = if (streakFrozen) current else 0,
+            streakFrozen = streakFrozen,
         )
     }
 

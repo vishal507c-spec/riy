@@ -8,7 +8,8 @@ package com.vishal.riy.tracker
  * `RiySnapshot` envelope picks the records up with no new backup machinery.
  *
  * Format — one record per line, `\u0000`-separated fields:
- * `epochDay \u0000 STATUS \u0000 createdAt \u0000 updatedAt`
+ * `epochDay \u0000 STATUS \u0000 createdAt \u0000 updatedAt \u0000 note`
+ * The note field is optional on decode so v1 payloads still load.
  *
  * Records are always written SORTED by epochDay. That is not cosmetic: the
  * backup identity is the SHA-256 of the serialized snapshot, so an unstable
@@ -18,7 +19,7 @@ package com.vishal.riy.tracker
 object TrackerSerialization {
 
     private const val FIELD = '\u0000'
-    private const val VERSION = 1
+    private const val VERSION = 2
 
     fun encode(records: List<TrackerDay>): String = buildString {
         append("v").append(VERSION).append('\n')
@@ -26,7 +27,8 @@ object TrackerSerialization {
             append(record.epochDay).append(FIELD)
             append(record.status.name).append(FIELD)
             append(record.createdAt).append(FIELD)
-            append(record.updatedAt).append('\n')
+            append(record.updatedAt).append(FIELD)
+            append(record.note.orEmpty()).append('\n')
         }
     }
 
@@ -47,7 +49,8 @@ object TrackerSerialization {
             val status = TrackerStatus.parse(parts[1]) ?: return@forEach
             val createdAt = parts.getOrNull(2)?.toLongOrNull() ?: 0L
             val updatedAt = parts.getOrNull(3)?.toLongOrNull() ?: createdAt
-            out.add(TrackerDay(epochDay, status, createdAt, updatedAt))
+            val note = parts.getOrNull(4)?.takeIf { it.isNotEmpty() }
+            out.add(TrackerDay(epochDay, status, createdAt, updatedAt, note))
         }
         // One effective record per date: last write wins.
         return out

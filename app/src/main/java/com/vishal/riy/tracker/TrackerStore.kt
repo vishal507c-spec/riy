@@ -41,9 +41,9 @@ class TrackerStore(context: Context) {
      * day can never inflate the YES count or create a duplicate backup row.
      * Returns the stored record.
      */
-    fun save(epochDay: Long, status: TrackerStatus, nowMillis: Long): TrackerDay {
+    fun save(epochDay: Long, status: TrackerStatus, nowMillis: Long, note: String? = null): TrackerDay {
         val existing = find(epochDay)
-        val record = TrackerDay.upsert(epochDay, status, nowMillis, existing)
+        val record = TrackerDay.upsert(epochDay, status, nowMillis, existing, note)
         val merged = all().filterNot { it.epochDay == epochDay } + record
         prefs.edit().putString(KEY_DAYS, TrackerSerialization.encode(merged)).apply()
         // Tracker history changed → coalesced Drive snapshot (never throws,
@@ -56,6 +56,50 @@ class TrackerStore(context: Context) {
     fun delete(epochDay: Long) {
         val remaining = all().filterNot { it.epochDay == epochDay }
         prefs.edit().putString(KEY_DAYS, TrackerSerialization.encode(remaining)).apply()
+        DriveSync.requestBackup()
+    }
+
+    /**
+     * Wipes history for one month. Returns how many records were deleted.
+     * Explicit user action only.
+     */
+    fun clearMonth(monthStart: Long, monthLength: Int): Int {
+        val monthDays = (0 until monthLength).map { monthStart + it }.toSet()
+        val deleted = all().filter { it.epochDay in monthDays }.size
+        if (deleted == 0) return 0
+        val remaining = all().filterNot { it.epochDay in monthDays }
+        prefs.edit().putString(KEY_DAYS, TrackerSerialization.encode(remaining)).apply()
+        DriveSync.requestBackup()
+        return deleted
+    }
+
+    /**
+     * Writes [status] for every date in [days], creating or overwriting the
+     * per-date record. Used by the month-marking bulk action. Each write is
+     * coalesced by Drive Sync exactly like a single save.
+     */
+    fun bulkSave(days: List<Long>, status: TrackerStatus, nowMillis: Long) {
+        if (days.isEmpty()) return
+        var merged = all()
+        val seen = HashSet<Long>(days.size)
+        days.forEach { day ->
+            if (seen.add(day)) {
+                val record = TrackerDay(epochDay = day, status = status, createdAt = nowMillis, updatedAt = nowMillis)
+                merged = merged.filterNot { it.epochDay == day } + record
+            }
+        }
+        prefs.edit().putString(KEY_DAYS, TrackerSerialization.encode(merged)).apply()
+        DriveSync.requestBackup()
+    }
+
+    /**
+     * Attaches or clears a free-text journal note for [epochDay]. The note
+     * never affects any count: it is display-only metadata of the day.
+     */
+    fun saveNote(epochDay: Long, note: String?, nowMillis: Long) {
+        val existing = find(epochDay) ?: return
+        val updated = existing.copy(note = note?.takeIf { it.isNotBlank() }, updatedAt = nowMillis)
+        prefs.edit().putString(KEY_DAYS, TrackerSerialization.encode(all().filterNot { it.epochDay == epochDay } + updated)).apply()
         DriveSync.requestBackup()
     }
 
@@ -88,6 +132,15 @@ class TrackerStore(context: Context) {
         get() = prefs.getInt(KEY_REMINDER_MINUTE, DEFAULT_REMINDER_MINUTE)
         set(value) = prefs.edit().putInt(KEY_REMINDER_MINUTE, value.coerceIn(0, 59)).apply()
 
+    /**
+     * Streak freeze: when on, the current NO-run stays visible instead of
+     * dropping to zero the day the streak breaks. Purely a display pause for
+     * streaks — no answer is invented, and nothing here changes counts.
+     */
+    var streakFreeze: Boolean
+        get() = prefs.getBoolean(KEY_STREAK_FREEZE, false)
+        set(value) = prefs.edit().putBoolean(KEY_STREAK_FREEZE, value).apply()
+
     companion object {
         /**
          * MUST match an entry in `RiySnapshot.STORE_FILES`. Appended last there
@@ -100,6 +153,7 @@ class TrackerStore(context: Context) {
         private const val KEY_REMINDER_ENABLED = "tracker_reminder_enabled"
         private const val KEY_REMINDER_HOUR = "tracker_reminder_hour"
         private const val KEY_REMINDER_MINUTE = "tracker_reminder_minute"
+        private const val KEY_STREAK_FREEZE = "tracker_streak_freeze"
 
         const val DEFAULT_REMINDER_HOUR = 9
         const val DEFAULT_REMINDER_MINUTE = 0

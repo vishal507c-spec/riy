@@ -18,6 +18,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,17 +40,22 @@ import com.vishal.riy.tracker.TrackerStatus
 /**
  * Check-in: one question, one explicit date, three answers. The date is passed
  * through unchanged to save — it is never re-derived from the clock.
+ *
+ * Also carries an optional daily note for the same date: it is written with
+ * the answer and never influences any count.
  */
 @Composable
 fun TrackerCheckInSheet(
     epochDay: Long,
     existingStatus: TrackerStatus?,
-    onSave: (Long, TrackerStatus) -> Unit,
+    existingNote: String? = null,
+    onSave: (Long, TrackerStatus, String?) -> Unit,
     onDismiss: () -> Unit,
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     var selected by remember(epochDay) { mutableStateOf(existingStatus) }
+    var note by remember(epochDay) { mutableStateOf(existingNote.orEmpty()) }
 
     SciFiFrame(
         header = "RIY // DAILY CHECK-IN",
@@ -113,10 +119,20 @@ fun TrackerCheckInSheet(
                 selected = selected == TrackerStatus.UNKNOWN,
             ) { selected = TrackerStatus.UNKNOWN }
 
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text(stringResource(R.string.tracker_daily_note)) },
+                placeholder = { Text(stringResource(R.string.tracker_daily_note_hint)) },
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 3,
+                shape = AppUI.CardRadius,
+            )
+
             Spacer(Modifier.height(6.dp))
 
             Button(
-                onClick = { selected?.let { onSave(epochDay, it) } },
+                onClick = { selected?.let { onSave(epochDay, it, note.takeIf { n -> n.isNotBlank() }) } },
                 enabled = selected != null,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = AppUI.CardRadius,

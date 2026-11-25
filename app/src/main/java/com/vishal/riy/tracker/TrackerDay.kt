@@ -50,12 +50,15 @@ enum class TrackerStatus {
  *                 and is deliberately NOT the same as a missing record.
  * @param createdAt epoch millis when this date was first recorded.
  * @param updatedAt epoch millis of the last edit.
+ * @param note       Optional short journal note attached to the day. Purely
+ *                   informational; it never influences any count or streak.
  */
 data class TrackerDay(
     val epochDay: Long,
     val status: TrackerStatus,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
+    val note: String? = null,
 ) {
     /** Stable identifier, derived only from the date. */
     val id: String get() = idFor(epochDay)
@@ -76,11 +79,13 @@ data class TrackerDay(
             status: TrackerStatus,
             nowMillis: Long,
             existing: TrackerDay?,
+            note: String? = null,
         ): TrackerDay = TrackerDay(
             epochDay = epochDay,
             status = status,
             createdAt = existing?.createdAt ?: nowMillis,
             updatedAt = nowMillis,
+            note = note ?: existing?.note,
         )
     }
 }

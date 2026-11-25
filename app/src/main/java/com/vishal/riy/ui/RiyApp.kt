@@ -111,12 +111,13 @@ fun RiyApp(openCheckInOnStart: Boolean = false) {
                         if (date == null) {
                             screen = AppScreen.MAIN
                         } else {
-                            val existing = trackerState.days.firstOrNull { it.epochDay == date }?.status
+                            val existing = trackerState.days.firstOrNull { it.epochDay == date }
                             TrackerCheckInSheet(
                                 epochDay = date,
-                                existingStatus = existing,
-                                onSave = { day, status ->
-                                    trackerViewModel.save(day, status)
+                                existingStatus = existing?.status,
+                                existingNote = existing?.note,
+                                onSave = { day, status, note ->
+                                    trackerViewModel.save(day, status, note)
                                     screen = if (existing != null) AppScreen.TRACKER else AppScreen.MAIN
                                 },
                                 onDismiss = {
@@ -142,6 +143,18 @@ fun RiyApp(openCheckInOnStart: Boolean = false) {
                             trackerViewModel.editDay(day)
                             screen = AppScreen.CHECK_IN
                         },
+                        onSetToday = trackerViewModel::setToday,
+                        onUndo = { trackerViewModel.undoLast() },
+                        onSetStreakFreeze = trackerViewModel::setStreakFreeze,
+                        onBulkMark = { status -> trackerViewModel.bulkMarkMonth(status) },
+                        onClearMonth = { trackerViewModel.clearMonth() },
+                        onExportCsv = { trackerViewModel.exportCsv() },
+                        reminderEnabled = trackerViewModel.reminderEnabled,
+                        onReminderEnabled = { trackerViewModel.reminderEnabled = it },
+                        reminderHour = trackerViewModel.reminderHour,
+                        onReminderHour = { trackerViewModel.reminderHour = it },
+                        reminderMinute = trackerViewModel.reminderMinute,
+                        onReminderMinute = { trackerViewModel.reminderMinute = it },
                         onConfirmationShown = trackerViewModel::clearConfirmation,
                     )
 
