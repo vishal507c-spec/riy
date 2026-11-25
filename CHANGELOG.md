@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.5.0 - 2026-11-25
+- The tracker is now **INNER FLAME**: renamed across the screen header, check-in header, entry button and bottom navigation.
+- The flame status hero answers "when did I keep it and when did it break" directly: a burning flame shows the current run length and the exact date it was kept since; a broken flame shows the exact date it went out, with the last-break line always visible. Real record dates only — nothing invented.
+- New flame history card: the recent kept runs as `start → end · N day(s)` rows, so the user can see at a glance when the flame was kept over time.
+- Legend updated: green now reads as "flame kept (NO)".
+
 ## v3.4.0 - 2026-11-25
 - Tracker UX rebuilt for lower cognitive load: a "Today" hero card answers the day in one tap without hunting through the calendar, one 15-day trend chart replaces the text ribbons, streak facts sit in a single card, settings (reminder + export) are parked at the bottom so they never interrupt logging, and destructive actions sit behind a confirmation dialog.
 - Ten new tracker features: Today quick-answer card, 15-day trend chart, streak-freeze toggle (display pause only — counts are never inflated), per-day private notes (journal field in the check-in, dot marker on the calendar), mark-all-of-this-month bulk action (NO/YES/NOT SURE, confirmed), clear-this-month bulk delete (confirmed), 5-second undo of the last save, in-app reminder settings (enable + HH:MM stepper that re-arms the existing alarm), streak breakdown card, and CSV export through the system share sheet (nothing leaves the device unless the user picks a receiving app).

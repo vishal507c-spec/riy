@@ -162,10 +162,10 @@
          Deliberately no levels, XP, recovery stages, dopamine percentages or
          health claims. The tracker reports recorded days and nothing else, and
          the numbers always come from real persisted data. -->
-    <string name="tracker_entry_title">Open Daily Tracker</string>
-    <string name="tracker_entry_subtitle">Track your days</string>
-    <string name="tracker_title">RIY SHIELD</string>
-    <string name="tracker_subtitle">Daily Tracker — tap any date below to add or change that day.</string>
+    <string name="tracker_entry_title">Open Inner Flame</string>
+    <string name="tracker_entry_subtitle">Keep your inner flame alive</string>
+    <string name="tracker_title">INNER FLAME</string>
+    <string name="tracker_subtitle">Tap any date below to add or change that day. Green days keep the flame burning.</string>
 
     <!-- Every number is explained in a plain sentence, and carries its unit, so
          no figure on this screen has to be interpreted by guesswork. -->
@@ -186,7 +186,7 @@
     <string name="tracker_calendar_header">MONTHLY CALENDAR</string>
     <string name="tracker_back">Back</string>
     <string name="tracker_saved">Saved</string>
-    <string name="tracker_legend">Green = NO · Amber = YES · Grey = not recorded or unknown. Tap a date to edit it.</string>
+    <string name="tracker_legend">Green = flame kept (NO) · Amber = YES · Grey = not recorded or unknown. A dot under a date means it has a note.</string>
 
     <!-- Tracker insights: honest counts only, never scores or health claims. -->
     <string name="tracker_insight_week_no">NO days this week</string>
@@ -213,6 +213,16 @@
     <string name="tracker_streak_freeze">Freeze streak</string>
     <string name="tracker_streak_freeze_desc">Pause the current-run display. Turn off to resume counting.</string>
     <string name="tracker_streak_frozen_note">Streak frozen at %1$d day(s) — turn off to resume counting.</string>
+
+    <!-- INNER FLAME: when it was kept, when it broke — always from real records. -->
+    <string name="tracker_flame_title">INNER FLAME</string>
+    <string name="tracker_flame_burning">Burning for %1$d day(s) — kept since %2$s</string>
+    <string name="tracker_flame_broken">Flame broke on %1$s</string>
+    <string name="tracker_flame_last_break">Last break: %1$s</string>
+    <string name="tracker_flame_never_broke">No break recorded yet — the flame has been kept since your first entry.</string>
+    <string name="tracker_flame_history">Flame history — when you kept it</string>
+    <string name="tracker_flame_segment">%1$s → %2$s · %3$d day(s)</string>
+    <string name="tracker_flame_never_kept">No kept runs yet — answer a day to light the flame.</string>
     <string name="tracker_daily_note">Daily note</string>
     <string name="tracker_daily_note_hint">Optional private note for this day — never counted anywhere</string>
     <string name="tracker_bulk_mark">Mark all of this month</string>

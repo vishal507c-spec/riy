@@ -41,10 +41,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.vishal.riy.R
+import com.vishal.riy.tracker.FlameSegment
 import com.vishal.riy.tracker.InsightTone
 import com.vishal.riy.tracker.TrackerCalendarDay
 import com.vishal.riy.tracker.TrackerDates
 import com.vishal.riy.tracker.TrackerInsights
+import com.vishal.riy.tracker.TrackerStats
 import com.vishal.riy.tracker.TrackerStatus
 import com.vishal.riy.tracker.TrackerUiState
 import java.util.Locale
@@ -83,7 +85,7 @@ fun TrackerScreen(
     modifier: Modifier = Modifier,
 ) {
     SciFiFrame(
-        header = "RIY // DAILY TRACKER",
+        header = "RIY // INNER FLAME",
         headerColor = SciFiColors.GoGreen,
         modifier = modifier,
     ) {
@@ -125,6 +127,11 @@ fun TrackerScreen(
 
             TodayCard(todayStatus = state.todayStatus, onSetToday = onSetToday)
 
+            FlameCard(
+                stats = state.stats,
+                onSetFreeze = onSetStreakFreeze,
+            )
+
             // Four real numbers in a balanced 2x2 grid.
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -159,13 +166,7 @@ fun TrackerScreen(
 
             TrackerStatusLine(state)
 
-            StreakCard(
-                currentStreak = state.stats.currentStreak,
-                longestStreak = state.stats.longestStreak,
-                streakFrozen = state.stats.streakFrozen,
-                frozenStreak = state.stats.frozenStreak,
-                onSetFreeze = onSetStreakFreeze,
-            )
+            FlameHistoryCard(segments = state.stats.flameSegments)
 
             TrendAndInsights(state)
 
@@ -341,35 +342,69 @@ private fun TrackerStatusLine(state: TrackerUiState) {
     }
 }
 
-/** Streak facts in one line, plus the streak-freeze pause toggle. */
+/**
+ * The INNER FLAME hero: when the flame is burning (kept since), when it last
+ * broke, and the freeze pause. The dates are real record dates — the user
+ * always sees exactly when the flame was kept and when it went out.
+ */
 @Composable
-private fun StreakCard(
-    currentStreak: Int,
-    longestStreak: Int,
-    streakFrozen: Boolean,
-    frozenStreak: Int,
+private fun FlameCard(
+    stats: TrackerStats,
     onSetFreeze: (Boolean) -> Unit,
 ) {
-    SectionCard {
-        SectionLabel(stringResource(R.string.tracker_streak_breakdown_title))
+    val tz = TimeZone.getDefault()
+    val alive = stats.currentStreak > 0
+    val container = if (alive) SciFiColors.GoGreen.copy(alpha = 0.12f) else SciFiColors.SolarAmber.copy(alpha = 0.12f)
+    SectionCard(container = container) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = if (alive) "🔥" else "💔",
+                style = typography.headlineMedium,
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = stringResource(R.string.tracker_flame_title),
+                    style = typography.labelLarge,
+                    color = colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = if (alive) {
+                        stringResource(
+                            R.string.tracker_flame_burning,
+                            stats.currentStreak,
+                            TrackerDates.formatDate(stats.flameStartDay!!, tz),
+                        )
+                    } else {
+                        stats.lastBreakDay?.let {
+                            stringResource(R.string.tracker_flame_broken, TrackerDates.formatDate(it, tz))
+                        } ?: stringResource(R.string.tracker_flame_never_kept)
+                    },
+                    style = typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (alive) SciFiColors.GoGreen else SciFiColors.SolarAmber,
+                )
+            }
+        }
+
         Spacer(Modifier.height(8.dp))
         Text(
-            text = stringResource(
-                R.string.tracker_streak_breakdown_body,
-                currentStreak,
-                longestStreak,
-            ),
-            style = typography.bodyMedium,
-            color = colorScheme.onSurface,
+            text = stats.lastBreakDay?.let {
+                stringResource(R.string.tracker_flame_last_break, TrackerDates.formatDate(it, tz))
+            } ?: stringResource(R.string.tracker_flame_never_broke),
+            style = typography.bodySmall,
+            color = colorScheme.onSurfaceVariant,
         )
-        if (streakFrozen && frozenStreak > 0) {
-            Spacer(Modifier.height(6.dp))
+        if (stats.streakFrozen && stats.frozenStreak > 0) {
+            Spacer(Modifier.height(4.dp))
             Text(
-                text = stringResource(R.string.tracker_streak_frozen_note, frozenStreak),
+                text = stringResource(R.string.tracker_streak_frozen_note, stats.frozenStreak),
                 style = typography.bodySmall,
                 color = SciFiColors.NeonCyan,
             )
         }
+
         Spacer(Modifier.height(10.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -389,7 +424,43 @@ private fun StreakCard(
                 )
             }
             Spacer(Modifier.width(12.dp))
-            Switch(checked = streakFrozen, onCheckedChange = onSetFreeze)
+            Switch(checked = stats.streakFrozen, onCheckedChange = onSetFreeze)
+        }
+    }
+}
+
+/** Recent flame runs, so "when did I keep it" is visible at a glance. */
+@Composable
+private fun FlameHistoryCard(segments: List<FlameSegment>) {
+    if (segments.isEmpty()) return
+    val tz = TimeZone.getDefault()
+    SectionCard {
+        SectionLabel(stringResource(R.string.tracker_flame_history))
+        Spacer(Modifier.height(8.dp))
+        segments.forEach { segment ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "🔥",
+                    style = typography.bodyMedium,
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = stringResource(
+                        R.string.tracker_flame_segment,
+                        TrackerDates.formatDate(segment.startDay, tz),
+                        TrackerDates.formatDate(segment.endDay, tz),
+                        segment.length,
+                    ),
+                    style = typography.bodyMedium,
+                    color = colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(6.dp))
         }
     }
 }

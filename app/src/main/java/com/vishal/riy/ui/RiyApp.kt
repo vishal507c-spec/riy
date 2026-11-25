@@ -98,7 +98,7 @@ fun RiyApp(openCheckInOnStart: Boolean = false) {
                             selected = screen == AppScreen.TRACKER,
                             onClick = { screen = AppScreen.TRACKER },
                             icon = { Icon(Icons.Filled.Timer, contentDescription = null) },
-                            label = { Text("Tracker") },
+                            label = { Text("Inner Flame") },
                         )
                     }
                 }

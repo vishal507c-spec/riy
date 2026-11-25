@@ -6,6 +6,17 @@ package com.vishal.riy.tracker
  * Counters are counts of UNIQUE DATES, never of events: several events on one
  * date still produce exactly one YES day.
  */
+
+/** One continuous run of kept days (confirmed NO) — a "flame kept" segment. */
+data class FlameSegment(
+    /** First day of the run. */
+    val startDay: Long,
+    /** Last day of the run. */
+    val endDay: Long,
+    /** Number of consecutive kept days. */
+    val length: Int,
+)
+
 data class TrackerStats(
     /** Unique dates confirmed YES. */
     val yesDays: Int,
@@ -32,6 +43,15 @@ data class TrackerStats(
      */
     val frozenStreak: Int = 0,
     val streakFrozen: Boolean = false,
+    /**
+     * INNER FLAME facts: when the flame was last kept ([flameStartDay] = first
+     * day of the current run), when it last broke ([lastBreakDay]) and the
+     * recent kept runs ([flameSegments], newest first). All derived from real
+     * records — never invented, never a health claim.
+     */
+    val flameStartDay: Long? = null,
+    val lastBreakDay: Long? = null,
+    val flameSegments: List<FlameSegment> = emptyList(),
 ) {
     /** Total days carrying any answer (YES + NO + UNKNOWN). */
     val recordedDays: Int get() = yesDays + noDays + unknownDays
@@ -109,6 +129,19 @@ object TrackerCalculator {
             byDay.values.filter { it.isConfirmedNo }.map { it.epochDay },
         )
 
+        // INNER FLAME facts: when the current flame was lit and when it last
+        // broke. A break is the first completed day that is not confirmed NO
+        // (missing, YES or UNKNOWN all break it).
+        val flameStart = if (current > 0) lastCompleted - current + 1 else null
+        val lastBreak = when {
+            current > 0 && flameStart!! > start -> flameStart - 1L
+            current == 0 && lastCompleted >= start -> lastCompleted
+            else -> null
+        }
+        val segments = flameSegments(
+            byDay.values.filter { it.isConfirmedNo }.map { it.epochDay }.sorted(),
+        )
+
         return TrackerStats(
             yesDays = yes,
             noDays = no,
@@ -120,7 +153,36 @@ object TrackerCalculator {
             latestRecordedDay = latest,
             frozenStreak = if (streakFrozen) current else 0,
             streakFrozen = streakFrozen,
+            flameStartDay = flameStart,
+            lastBreakDay = lastBreak,
+            flameSegments = segments,
         )
+    }
+
+    /**
+     * Recent kept runs, newest first, capped at [max]. Used by the flame
+     * history so the user can SEE when the flame was kept over time.
+     */
+    fun flameSegments(sortedNoDays: List<Long>, max: Int = 5): List<FlameSegment> {
+        if (sortedNoDays.isEmpty()) return emptyList()
+        val segments = ArrayList<FlameSegment>()
+        var runStart = sortedNoDays.first()
+        var runEnd = sortedNoDays.first()
+        var runLength = 1
+        for (i in 1 until sortedNoDays.size) {
+            val day = sortedNoDays[i]
+            if (day == runEnd + 1L) {
+                runEnd = day
+                runLength++
+            } else {
+                segments.add(FlameSegment(runStart, runEnd, runLength))
+                runStart = day
+                runEnd = day
+                runLength = 1
+            }
+        }
+        segments.add(FlameSegment(runStart, runEnd, runLength))
+        return segments.sortedByDescending { it.endDay }.take(max)
     }
 
     /**

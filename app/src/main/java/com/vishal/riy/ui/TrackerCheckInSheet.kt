@@ -58,7 +58,7 @@ fun TrackerCheckInSheet(
     var note by remember(epochDay) { mutableStateOf(existingNote.orEmpty()) }
 
     SciFiFrame(
-        header = "RIY // DAILY CHECK-IN",
+        header = "RIY // INNER FLAME CHECK-IN",
         headerColor = SciFiColors.GoGreen,
         modifier = modifier,
     ) {
