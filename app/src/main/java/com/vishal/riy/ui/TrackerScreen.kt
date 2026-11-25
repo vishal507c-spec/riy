@@ -23,7 +23,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -74,12 +73,6 @@ fun TrackerScreen(
     onUndo: () -> Unit,
     onDeleteRecord: (Long) -> Unit,
     onExportCsv: () -> Unit,
-    reminderEnabled: Boolean,
-    onReminderEnabled: (Boolean) -> Unit,
-    reminderHour: Int,
-    onReminderHour: (Int) -> Unit,
-    reminderMinute: Int,
-    onReminderMinute: (Int) -> Unit,
     onConfirmationShown: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -140,12 +133,6 @@ fun TrackerScreen(
             )
 
             SettingsCard(
-                reminderEnabled = reminderEnabled,
-                reminderHour = reminderHour,
-                reminderMinute = reminderMinute,
-                onReminderEnabled = onReminderEnabled,
-                onReminderHour = onReminderHour,
-                onReminderMinute = onReminderMinute,
                 onExportCsv = onExportCsv,
             )
         }
@@ -198,6 +185,17 @@ private fun DailyCheckInCard(
             text = stringResource(R.string.tracker_today_question),
             style = typography.titleMedium,
             color = colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "Track one thing: did you have a leak today?",
+            style = typography.bodySmall,
+            color = colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = "Leak = a slip. No Leak = a clean day. Not Recorded = no answer.",
+            style = typography.bodySmall,
+            color = colorScheme.onSurfaceVariant,
         )
         if (todayStatus != null) {
             Spacer(Modifier.height(4.dp))
@@ -521,64 +519,9 @@ private fun RecentHistoryCard(
 /** E. Settings — reminder, privacy disclosure and export. */
 @Composable
 private fun SettingsCard(
-    reminderEnabled: Boolean,
-    reminderHour: Int,
-    reminderMinute: Int,
-    onReminderEnabled: (Boolean) -> Unit,
-    onReminderHour: (Int) -> Unit,
-    onReminderMinute: (Int) -> Unit,
     onExportCsv: () -> Unit,
 ) {
     SectionCard(container = Color(0xFF141414)) {
-        SectionLabel(stringResource(R.string.tracker_reminder_settings))
-        Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.tracker_reminder_enabled),
-                    style = typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = stringResource(R.string.tracker_reminder_help),
-                    style = typography.bodySmall,
-                    color = colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Switch(checked = reminderEnabled, onCheckedChange = onReminderEnabled)
-        }
-        if (reminderEnabled) {
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = stringResource(R.string.tracker_reminder_time),
-                style = typography.bodySmall,
-                color = colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(4.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TimeStepper(
-                    label = stringResource(R.string.tracker_hour),
-                    value = reminderHour,
-                    onDecrease = { onReminderHour((reminderHour + 23) % 24) },
-                    onIncrease = { onReminderHour((reminderHour + 1) % 24) },
-                )
-                TimeStepper(
-                    label = stringResource(R.string.tracker_minute),
-                    value = reminderMinute,
-                    onDecrease = { onReminderMinute((reminderMinute + 59) % 60) },
-                    onIncrease = { onReminderMinute((reminderMinute + 1) % 60) },
-                )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
         SectionLabel(stringResource(R.string.tracker_privacy_title))
         Spacer(Modifier.height(6.dp))
         Text(
@@ -605,43 +548,6 @@ private fun SettingsCard(
             style = typography.bodySmall,
             color = colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun TimeStepper(label: String, value: Int, onDecrease: () -> Unit, onIncrease: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = label,
-            style = typography.labelSmall,
-            color = colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StepButton("−", onDecrease)
-            Text(
-                text = String.format(Locale.US, "%02d", value),
-                style = typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.width(34.dp),
-            )
-            StepButton("+", onIncrease)
-        }
-    }
-}
-
-@Composable
-private fun StepButton(symbol: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(32.dp)
-            .background(colorScheme.primaryContainer, CircleShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = symbol, style = typography.titleMedium, color = colorScheme.primary)
     }
 }
 

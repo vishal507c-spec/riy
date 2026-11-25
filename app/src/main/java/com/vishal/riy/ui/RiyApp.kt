@@ -147,12 +147,6 @@ fun RiyApp(openCheckInOnStart: Boolean = false) {
                         onUndo = { trackerViewModel.undoLast() },
                         onDeleteRecord = { trackerViewModel.delete(it) },
                         onExportCsv = { trackerViewModel.exportCsv() },
-                        reminderEnabled = trackerViewModel.reminderEnabled,
-                        onReminderEnabled = { trackerViewModel.reminderEnabled = it },
-                        reminderHour = trackerViewModel.reminderHour,
-                        onReminderHour = { trackerViewModel.reminderHour = it },
-                        reminderMinute = trackerViewModel.reminderMinute,
-                        onReminderMinute = { trackerViewModel.reminderMinute = it },
                         onConfirmationShown = trackerViewModel::clearConfirmation,
                     )
 

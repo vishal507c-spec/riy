@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.9.0 - 2026-11-25
+- Improved tracker clarity: the daily check-in now states exactly what is tracked ("did you have a leak today?") and explains Leak / No Leak / Not Recorded.
+- Removed the reminder controls from the tracker UI and settings card.
+- Removed the top "RIY" frame header from the tracker screen for a cleaner look.
+- Removed unused reminder UI code from the tracker screen.
+
 ## v3.8.0 - 2026-11-25
 - Reordered the bottom navigation so **Inner Flame** is the first tab and **Shield** is the second.
 - The app now opens on Inner Flame by default.
