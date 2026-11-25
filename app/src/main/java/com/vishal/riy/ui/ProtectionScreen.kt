@@ -4,12 +4,17 @@ import android.app.Activity
 import android.net.VpnService
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,9 +42,14 @@ import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -54,12 +64,12 @@ import com.vishal.riy.blocker.ShieldStatus
 import com.vishal.riy.protection.ui.ProtectionUiState
 
 /**
- * RIY's single dashboard — redesigned as a calm, readable shield console.
+ * RIY's home page — deliberately simple.
  *
- * It renders the AUTHORITATIVE [ProtectionUiState]; it never decides a state,
- * never computes a deadline, and offers exactly one action: starting the VPN
- * after the system consent dialog. Every word and colour is a pure function of
- * the authoritative state, so the UI can never claim unverified protection.
+ * A non-technical person sees three things first: whether the shield is on, one
+ * plain sentence about what that means, and one button if anything needs
+ * attention. The technical checks are still available, but they live behind a
+ * single "See every check" toggle so they can never crowd the main answer.
  */
 @Composable
 fun ProtectionScreen(
@@ -101,9 +111,14 @@ internal fun ProtectionScreen(
 ) {
     val presentation = state.userFacing()
     val verified = state.shieldStatus == ShieldStatus.VERIFIED
+    val actionAllowed = !state.isRestricted && !state.isRecovering &&
+        state.shieldStatus != ShieldStatus.VERIFIED
+    val actionEnabled = state.shieldStatus != ShieldStatus.INITIALIZING &&
+        state.shieldStatus != ShieldStatus.UNKNOWN
+    var showDetails by rememberSaveable { mutableStateOf(false) }
 
     SciFiFrame(
-        header = "RIY // SHIELD CONSOLE",
+        header = "RIY",
         headerColor = SciFiColors.NeonCyan,
         modifier = modifier,
     ) {
@@ -117,53 +132,26 @@ internal fun ProtectionScreen(
         ) {
             Spacer(Modifier.height(18.dp))
 
-            // Brand row — quiet, no technical vocabulary.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(SciFiColors.CyanDepth),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("R", color = SciFiColors.NeonCyan, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.width(10.dp))
-                Column {
+            AppHeader(
+                title = stringResource(R.string.shield_title),
+                subtitle = stringResource(R.string.shield_subtitle),
+                trailing = {
                     Text(
-                        text = stringResource(R.string.app_name),
-                        style = typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = stringResource(R.string.shield_subtitle),
+                        text = BuildConfig.VERSION_NAME,
                         style = typography.labelSmall,
-                        color = colorScheme.onSurfaceVariant,
+                        color = SciFiColors.Telemetry,
                     )
-                }
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = BuildConfig.VERSION_NAME,
-                    style = typography.labelSmall,
-                    color = SciFiColors.Telemetry,
-                )
-            }
+                },
+            )
 
-            // Hero: one icon, one title, one honest sentence.
+            // One icon, one title, one honest sentence — the whole story.
             HeroStatusCard(presentation.icon, presentation.titleRes, presentation.detailRes, verified)
 
-            // Primary status card.
-            PrimaryStatusCard(state.shieldStatus)
-
-            // The single action, only when nothing restricts the device.
-            if (!state.isRestricted && !state.isRecovering) {
+            if (actionAllowed) {
                 Button(
                     onClick = onEnableProtection,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                    enabled = state.shieldStatus != ShieldStatus.INITIALIZING,
+                    enabled = actionEnabled,
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = SciFiColors.NeonCyan,
@@ -171,47 +159,44 @@ internal fun ProtectionScreen(
                     ),
                 ) {
                     Text(
-                        text = stringResource(R.string.action_enable_protection),
+                        text = stringResource(protectionActionLabel(state.shieldStatus)),
                         style = typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                     )
                 }
             }
 
-            // Quick, truthful facts.
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FactCard(
-                    modifier = Modifier.weight(1f),
-                    label = stringResource(R.string.details_device),
-                    value = stringResource(
-                        if (state.deviceOwnerActive) R.string.state_ready else R.string.state_unavailable,
-                    ),
-                    good = state.deviceOwnerActive,
+            // Two plain facts. No "network", "integrity" or "enforcement".
+            SectionCard {
+                SectionLabel(stringResource(R.string.shield_working_title))
+                Spacer(Modifier.height(12.dp))
+                FactRow(
+                    label = stringResource(R.string.shield_sites_label),
+                    value = stringResource(websiteValueRes(state.shieldStatus)),
+                    color = if (verified) SciFiColors.GoGreen else SciFiColors.SolarAmber,
                 )
-                FactCard(
-                    modifier = Modifier.weight(1f),
-                    label = stringResource(R.string.details_network),
-                    value = stringResource(
-                        if (verified) R.string.state_ready
-                        else if (state.shieldStatus.isFiltering) R.string.state_unverified
-                        else R.string.state_unavailable,
-                    ),
-                    good = verified,
+                Spacer(Modifier.height(10.dp))
+                FactRow(
+                    label = stringResource(R.string.shield_calls_label),
+                    value = stringResource(R.string.shield_calls_value),
+                    color = SciFiColors.GoGreen,
                 )
             }
 
-            // Daily tracker entry.
+            // The daily tracker entry, in the same plain language.
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = onOpenTracker),
-                shape = RoundedCornerShape(16.dp),
+                shape = AppUI.CardRadius,
                 colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceVariant),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Text(text = "🔥", style = typography.headlineSmall)
+                    Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.tracker_entry_title),
@@ -219,7 +204,7 @@ internal fun ProtectionScreen(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            text = stringResource(R.string.tracker_entry_subtitle),
+                            text = stringResource(R.string.tracker_entry_prompt),
                             style = typography.bodySmall,
                             color = colorScheme.onSurfaceVariant,
                         )
@@ -228,9 +213,52 @@ internal fun ProtectionScreen(
                 }
             }
 
-            ProtectionDetailsCard(state)
-            ShieldLayersSection(state)
-            HowItWorksSection()
+            // Everything technical is optional now, behind one calm toggle.
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showDetails = !showDetails },
+                shape = AppUI.CardRadius,
+                colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(
+                                if (showDetails) R.string.shield_details_hide
+                                else R.string.shield_details_show,
+                            ),
+                            style = typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = stringResource(R.string.shield_details_hint),
+                            style = typography.bodySmall,
+                            color = colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = if (showDetails) "−" else "+",
+                        style = typography.headlineSmall,
+                        color = SciFiColors.NeonCyan,
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = showDetails,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    ProtectionDetailsCard(state)
+                    ShieldLayersSection(state)
+                    HowItWorksSection()
+                }
+            }
 
             Spacer(Modifier.height(8.dp))
         }
@@ -295,87 +323,48 @@ private fun HeroStatusCard(
     }
 }
 
+/** One plain fact line: "Adult websites — Blocked". */
 @Composable
-private fun FactCard(modifier: Modifier = Modifier, label: String, value: String, good: Boolean) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceVariant),
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(text = label, style = typography.labelSmall, color = colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(if (good) SciFiColors.GoGreen else SciFiColors.SolarAmber),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(text = value, style = typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-}
-
-/** One primary status card, driven only by the authoritative shield status. */
-@Composable
-private fun PrimaryStatusCard(status: ShieldStatus) {
-    val broken = status == ShieldStatus.FILTER_FAILED || status == ShieldStatus.PERMISSION_MISSING
-    val tint = when {
-        broken -> colorScheme.error
-        status.isFiltering -> SciFiColors.GoGreen
-        status == ShieldStatus.INITIALIZING || status == ShieldStatus.DISCONNECTED -> SciFiColors.SolarAmber
-        else -> SciFiColors.Telemetry
-    }
-    Card(
+private fun FactRow(label: String, value: String, color: Color) {
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(tint),
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(statusLabelRes(status)),
-                    style = typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = filterDetail(status),
-                    style = typography.bodySmall,
-                    color = colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        Box(Modifier.size(9.dp).background(color, CircleShape))
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = label,
+            style = typography.bodyMedium,
+            color = colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            style = typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = color,
+        )
     }
 }
 
-private fun statusLabelRes(status: ShieldStatus): Int = when (status) {
-    ShieldStatus.VERIFIED -> R.string.filter_label_verified
-    ShieldStatus.RUNNING_UNVERIFIED -> R.string.filter_label_unverified
-    ShieldStatus.INITIALIZING, ShieldStatus.UNKNOWN -> R.string.filter_label_starting
-    ShieldStatus.PERMISSION_MISSING -> R.string.filter_label_permission_missing
-    ShieldStatus.DISCONNECTED -> R.string.filter_label_disconnected
-    ShieldStatus.FILTER_FAILED -> R.string.filter_label_failed
-    ShieldStatus.DISABLED -> R.string.filter_label_off
+/** The button says exactly what it will do, in the user's words. */
+private fun protectionActionLabel(status: ShieldStatus): Int = when (status) {
+    ShieldStatus.PERMISSION_MISSING -> R.string.action_allow_protection
+    ShieldStatus.FILTER_FAILED,
+    ShieldStatus.DISCONNECTED,
+    ShieldStatus.RUNNING_UNVERIFIED -> R.string.action_fix_protection
+    ShieldStatus.INITIALIZING,
+    ShieldStatus.UNKNOWN -> R.string.action_protection_starting
+    else -> R.string.action_enable_protection
 }
 
-@Composable
-private fun filterDetail(status: ShieldStatus): String = when (status) {
-    ShieldStatus.VERIFIED -> stringResource(R.string.filter_verified)
-    ShieldStatus.RUNNING_UNVERIFIED -> stringResource(R.string.filter_unverified)
-    ShieldStatus.INITIALIZING, ShieldStatus.UNKNOWN -> stringResource(R.string.filter_initializing)
-    ShieldStatus.PERMISSION_MISSING -> stringResource(R.string.filter_permission_missing)
-    ShieldStatus.DISCONNECTED -> stringResource(R.string.filter_disconnected)
-    ShieldStatus.FILTER_FAILED -> stringResource(R.string.filter_failed)
-    ShieldStatus.DISABLED -> stringResource(R.string.filter_off)
+/** Plain words for the one thing on this page that is easy to misunderstand. */
+private fun websiteValueRes(status: ShieldStatus): Int = when (status) {
+    ShieldStatus.VERIFIED -> R.string.shield_sites_blocked
+    ShieldStatus.RUNNING_UNVERIFIED -> R.string.shield_sites_not_confirmed
+    ShieldStatus.INITIALIZING, ShieldStatus.UNKNOWN -> R.string.shield_sites_starting
+    ShieldStatus.DISABLED -> R.string.shield_sites_off
+    ShieldStatus.PERMISSION_MISSING,
+    ShieldStatus.DISCONNECTED,
+    ShieldStatus.FILTER_FAILED -> R.string.shield_sites_not_blocked
 }
-

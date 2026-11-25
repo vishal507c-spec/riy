@@ -141,6 +141,15 @@ class TrackerStore(context: Context) {
         get() = prefs.getBoolean(KEY_STREAK_FREEZE, false)
         set(value) = prefs.edit().putBoolean(KEY_STREAK_FREEZE, value).apply()
 
+    /**
+     * The run length captured when the user pressed "pause". Display-only:
+     * the real streak keeps being computed from records, and this number can
+     * never inflate a count.
+     */
+    var streakFreezeValue: Int
+        get() = prefs.getInt(KEY_STREAK_FREEZE_VALUE, 0)
+        set(value) = prefs.edit().putInt(KEY_STREAK_FREEZE_VALUE, value.coerceAtLeast(0)).apply()
+
     companion object {
         /**
          * MUST match an entry in `RiySnapshot.STORE_FILES`. Appended last there
@@ -154,6 +163,7 @@ class TrackerStore(context: Context) {
         private const val KEY_REMINDER_HOUR = "tracker_reminder_hour"
         private const val KEY_REMINDER_MINUTE = "tracker_reminder_minute"
         private const val KEY_STREAK_FREEZE = "tracker_streak_freeze"
+        private const val KEY_STREAK_FREEZE_VALUE = "tracker_streak_freeze_value"
 
         const val DEFAULT_REMINDER_HOUR = 9
         const val DEFAULT_REMINDER_MINUTE = 0

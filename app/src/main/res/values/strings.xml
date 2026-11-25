@@ -1,10 +1,28 @@
 <resources>
     <string name="app_name">Riy</string>
-    <string name="shield_subtitle">Daily protection shield</string>
+    <string name="shield_title">RIY SHIELD</string>
+    <string name="shield_subtitle">Your daily protection</string>
     <string name="app_version_label">Version %1$s</string>
 
     <!-- Actions -->
-    <string name="action_enable_protection">Enable Protection</string>
+    <string name="action_enable_protection">Turn on protection</string>
+    <string name="action_fix_protection">Fix protection</string>
+    <string name="action_allow_protection">Allow protection</string>
+    <string name="action_protection_starting">Turning on…</string>
+
+    <!-- Plain-language facts on the home page -->
+    <string name="shield_working_title">WHAT\'S WORKING</string>
+    <string name="shield_sites_label">Adult websites</string>
+    <string name="shield_sites_blocked">Blocked</string>
+    <string name="shield_sites_not_confirmed">Not confirmed</string>
+    <string name="shield_sites_not_blocked">Not blocked</string>
+    <string name="shield_sites_starting">Starting…</string>
+    <string name="shield_sites_off">Off</string>
+    <string name="shield_calls_label">Calls &amp; Telegram</string>
+    <string name="shield_calls_value">Always open</string>
+    <string name="shield_details_show">See every check</string>
+    <string name="shield_details_hide">Hide every check</string>
+    <string name="shield_details_hint">What RIY checks, and how it works</string>
 
     <!-- VPN service -->
     <string name="blocker_vpn_session">Riy Adult Content Filter</string>
@@ -23,25 +41,25 @@
 
     <!-- One large status title per situation -->
     <string name="status_protected_title">You\'re Protected</string>
-    <string name="status_protected_detail">RIY is protecting this device.</string>
+    <string name="status_protected_detail">Adult websites are blocked. Calls and Telegram still work.</string>
 
-    <string name="status_restricted_title">Restricted Mode</string>
-    <string name="status_restricted_detail">RIY is temporarily limiting this device.</string>
+    <string name="status_restricted_title">2-Hour Limit</string>
+    <string name="status_restricted_detail">You slipped, so apps are paused for 2 hours.\nCalls and Telegram stay open.</string>
 
     <string name="status_hardened_title">Extra Protection</string>
-    <string name="status_hardened_detail">RIY has strengthened protection after repeated protection triggers.</string>
+    <string name="status_hardened_detail">Protection is stronger after repeated slips.</string>
 
-    <string name="status_recovery_title">Restoring Protection</string>
-    <string name="status_recovery_detail">RIY is restoring your protection.\nPlease wait.</string>
+    <string name="status_recovery_title">Getting Protection Back</string>
+    <string name="status_recovery_detail">RIY is putting your shield back in place.\nPlease wait.</string>
 
-    <string name="status_mismatch_title">Protection Needs Attention</string>
-    <string name="status_mismatch_detail">RIY detected that protection needs to be restored.\nRIY is working to restore your protection.</string>
+    <string name="status_mismatch_title">Protection Needs a Check</string>
+    <string name="status_mismatch_detail">Something did not match, so RIY is fixing it.</string>
 
     <!-- The single primary status card line -->
-    <string name="protection_active_line">Protection Active</string>
-    <string name="protection_active_normal">Protection is running normally.</string>
-    <string name="protection_active_restricted">Some apps are temporarily unavailable.</string>
-    <string name="protection_active_hardened">Restricted Mode is still active.</string>
+    <string name="protection_active_line">Protection is on</string>
+    <string name="protection_active_normal">Everything is running normally.</string>
+    <string name="protection_active_restricted">Some apps are paused.</string>
+    <string name="protection_active_hardened">The 2-hour limit is still on.</string>
 
     <!-- Countdown -->
     <string name="time_remaining_label">remaining</string>
@@ -65,63 +83,63 @@
     <string name="explanation_restricted">RIY detected activity that triggered protection.\nThe restriction will end automatically when the timer reaches zero.</string>
 
     <!-- Optional Protection Details: technical states translated to normal language -->
-    <string name="details_section">Protection Details</string>
-    <string name="details_device">Device protection</string>
-    <string name="details_apps">App restrictions</string>
-    <string name="details_network">Network protection</string>
-    <string name="details_integrity">Integrity verified</string>
+    <string name="details_section">Shield details</string>
+    <string name="details_device">Phone protection</string>
+    <string name="details_apps">App limits</string>
+    <string name="details_network">Website blocking</string>
+    <string name="details_integrity">System check</string>
 
-    <string name="state_active">Active</string>
-    <string name="state_applying">Applying…</string>
-    <string name="state_unavailable">Unavailable</string>
+    <string name="state_active">On</string>
+    <string name="state_applying">Working…</string>
+    <string name="state_unavailable">Not available</string>
     <string name="state_ready">Ready</string>
 
     <!-- Advanced feature showcase: what the app guards, in plain language -->
-    <string name="features_section">Shield Layers</string>
-    <string name="features_section_detail">Everything RIY guards, and how each guard is doing right now.</string>
+    <string name="features_section">What RIY checks</string>
+    <string name="features_section_detail">Green means working now. Tap a line to learn more.</string>
 
-    <string name="layer_network_title">Network Filter</string>
-    <string name="layer_network_desc">Harmful sites are blocked in every app and browser, before they can load.</string>
+    <string name="layer_network_title">Adult websites</string>
+    <string name="layer_network_desc">Blocked in every app and browser, before a page can open.</string>
 
-    <string name="layer_lock_title">2-Hour Limit</string>
-    <string name="layer_lock_desc">A harmful request starts a 2-hour device limit, automatically.</string>
+    <string name="layer_lock_title">2-hour app limit</string>
+    <string name="layer_lock_desc">A slip starts a 2-hour limit automatically.</string>
 
-    <string name="layer_telegram_title">Telegram Stays Open</string>
-    <string name="layer_telegram_desc">Chats, groups and calls keep working. Telegram is never blocked.</string>
+    <string name="layer_telegram_title">Calls &amp; Telegram</string>
+    <string name="layer_telegram_desc">Phone calls and Telegram always stay open.</string>
 
-    <string name="layer_bypass_title">Bypass Apps Blocked</string>
-    <string name="layer_bypass_desc">File-sharing and bypass apps cannot open while protection is active.</string>
+    <string name="layer_bypass_title">Bypass apps</string>
+    <string name="layer_bypass_desc">Apps that could sneak around the filter cannot open while protection is on.</string>
 
-    <string name="layer_install_title">Install Guard</string>
-    <string name="layer_install_desc">Unknown app installs are stopped while protection is active.</string>
+    <string name="layer_install_title">New app installs</string>
+    <string name="layer_install_desc">Unknown apps cannot be installed while protection is on.</string>
 
-    <string name="layer_recovery_title">Reboot Recovery</string>
-    <string name="layer_recovery_desc">Protection restores itself after a restart or a reboot.</string>
+    <string name="layer_recovery_title">Restart recovery</string>
+    <string name="layer_recovery_desc">Protection comes back by itself after a restart.</string>
 
     <!-- Second-depth lines, revealed by tapping a layer -->
-    <string name="layer_network_more">Runs as a lightweight filter on this device. Your messages and chats are never read.</string>
-    <string name="layer_lock_more">Only a confirmed harmful request can start it. The timer cannot be skipped or cleared early.</string>
-    <string name="layer_telegram_more">Telegram is on the allowed list by policy, so it stays open even during a limit.</string>
-    <string name="layer_bypass_more">These apps are hidden and paused automatically the moment protection starts.</string>
-    <string name="layer_install_more">Needs the full device setup. Your normal app updates are never touched.</string>
+    <string name="layer_network_more">RIY runs a small filter on this phone. It never reads your chats, calls or messages.</string>
+    <string name="layer_lock_more">Only a real slip can start it. The timer cannot be skipped.</string>
+    <string name="layer_telegram_more">They are on the allowed list, even during a limit.</string>
+    <string name="layer_bypass_more">These apps are paused automatically when protection starts.</string>
+    <string name="layer_install_more">Normal app updates are never touched.</string>
     <string name="layer_recovery_more">Every restart re-checks the limit and the guards, then restores them.</string>
-    <string name="layer_tap_hint">Tap a layer for more</string>
+    <string name="layer_tap_hint">Tap a line to open it</string>
 
     <!-- How-it-works pipeline, in plain language -->
-    <string name="how_section">How It Works</string>
-    <string name="how_section_detail">From a harmful request to recovery, in four steps.</string>
+    <string name="how_section">How it works</string>
+    <string name="how_section_detail">From a slip to normal, in four simple steps.</string>
 
-    <string name="how_step1_title">Spot</string>
-    <string name="how_step1_desc">The filter spots a harmful request on the network.</string>
+    <string name="how_step1_title">A slip</string>
+    <string name="how_step1_desc">The filter notices an adult site being opened.</string>
 
-    <string name="how_step2_title">Verify</string>
-    <string name="how_step2_desc">Checks confirm it twice, so a mistake can never start a limit.</string>
+    <string name="how_step2_title">Double-check</string>
+    <string name="how_step2_desc">Two checks confirm it, so a mistake cannot start a limit.</string>
 
-    <string name="how_step3_title">Limit</string>
-    <string name="how_step3_desc">The device is limited for 2 hours. Calls and Telegram stay on.</string>
+    <string name="how_step3_title">2-hour limit</string>
+    <string name="how_step3_desc">Apps pause for 2 hours. Calls and Telegram stay open.</string>
 
-    <string name="how_step4_title">Recover</string>
-    <string name="how_step4_desc">The limit ends by itself, and survives restarts.</string>
+    <string name="how_step4_title">Back to normal</string>
+    <string name="how_step4_desc">The limit ends by itself, even after a restart.</string>
 
     <!-- Honest status line, never a reassuring default -->
     <string name="enforcement_verified">Enforcement verified</string>
@@ -162,44 +180,52 @@
          Deliberately no levels, XP, recovery stages, dopamine percentages or
          health claims. The tracker reports recorded days and nothing else, and
          the numbers always come from real persisted data. -->
-    <string name="tracker_entry_title">Open Inner Flame</string>
+    <string name="tracker_entry_title">Inner Flame</string>
     <string name="tracker_entry_subtitle">Keep your inner flame alive</string>
+    <string name="tracker_entry_prompt">Did you keep it today? Tap to check in.</string>
     <string name="tracker_title">INNER FLAME</string>
-    <string name="tracker_subtitle">Tap any date below to add or change that day. Green days keep the flame burning.</string>
+    <string name="tracker_subtitle">One day at a time. Green means you stayed clean.</string>
 
     <!-- Every number is explained in a plain sentence, and carries its unit, so
          no figure on this screen has to be interpreted by guesswork. -->
     <string name="tracker_unit_days">days</string>
-    <string name="tracker_hint_yes">Days you recorded YES</string>
-    <string name="tracker_hint_no">Days you recorded NO</string>
-    <string name="tracker_hint_current_streak">NO days in a row, up to yesterday</string>
-    <string name="tracker_hint_longest_streak">Best NO run you have ever had</string>
-    <string name="tracker_status_empty">No entries yet. Use yesterday\'s check-in, or tap a date below to add one.</string>
+    <string name="tracker_hint_yes">Days you answered slipped</string>
+    <string name="tracker_hint_no">Days you answered stayed clean</string>
+    <string name="tracker_hint_current_streak">Clean days in a row, up to yesterday</string>
+    <string name="tracker_hint_longest_streak">Your longest clean run ever</string>
+    <string name="tracker_status_empty">No entries yet. Answer today to start.</string>
     <string name="tracker_status_summary">%1$d day(s) saved. Last entry: %2$s. Tracking since %3$s.</string>
 
-    <string name="tracker_stat_yes_days">MASTURBATION DAYS</string>
-    <string name="tracker_stat_no_days">NON-MASTURBATION DAYS</string>
-    <string name="tracker_stat_current_streak">CURRENT STREAK</string>
-    <string name="tracker_stat_longest_streak">LONGEST STREAK</string>
-    <string name="tracker_numbers_title">YOUR NUMBERS</string>
-    <string name="tracker_trend_start">15 days ago</string>
+    <string name="tracker_stat_yes_days">DAYS SLIPPED</string>
+    <string name="tracker_stat_no_days">DAYS CLEAN</string>
+    <string name="tracker_stat_current_streak">CURRENT RUN</string>
+    <string name="tracker_stat_longest_streak">BEST RUN</string>
+    <string name="tracker_numbers_title">YOUR JOURNEY</string>
+    <string name="tracker_journey_recorded">Based on %1$d day(s) you answered.</string>
+    <string name="tracker_journey_best_hint">Best run = your longest unbroken clean streak.</string>
+    <string name="tracker_trend_start">2 weeks ago</string>
     <string name="tracker_trend_end">Today</string>
     <string name="tracker_unrecorded_note">%1$d day(s) in this period have no entry. They are not counted as either kind of day.</string>
 
-    <string name="tracker_calendar_header">MONTHLY CALENDAR</string>
+    <string name="tracker_calendar_header">YOUR MONTH</string>
+    <string name="tracker_calendar_hint">Tap a day to change it. A dot means that day has a note.</string>
     <string name="tracker_back">Back</string>
     <string name="tracker_saved">Saved</string>
-    <string name="tracker_legend">Green = flame kept (NO) · Amber = YES · Grey = not recorded or unknown. A dot under a date means it has a note.</string>
+    <string name="tracker_legend">Green = stayed clean · Orange = slipped · Grey = no answer. A dot under a date means it has a note.</string>
+    <string name="tracker_legend_clean">Stayed clean</string>
+    <string name="tracker_legend_slipped">Slipped</string>
+    <string name="tracker_legend_not_sure">Not sure</string>
+    <string name="tracker_legend_no_answer">No answer</string>
 
     <!-- Tracker insights: honest counts only, never scores or health claims. -->
-    <string name="tracker_insight_week_no">NO days this week</string>
+    <string name="tracker_insight_week_no">Clean days this week</string>
     <string name="tracker_insight_answered">Days answered (last 14)</string>
     <string name="tracker_insight_best_run">Best run (last 14 days)</string>
     <string name="tracker_insight_current">Current run</string>
     <string name="tracker_insight_longest">Best run ever</string>
     <string name="tracker_insight_recorded">Days recorded</string>
-    <string name="tracker_insight_since_yes">Days since last YES</string>
-    <string name="tracker_insight_since_no">Days since last NO</string>
+    <string name="tracker_insight_since_yes">Days since last slip</string>
+    <string name="tracker_insight_since_no">Days since last clean day</string>
     <string name="tracker_insight_milestone">Days to next milestone</string>
     <string name="tracker_insight_today">Today</string>
     <string name="tracker_insights_title">Insights</string>
@@ -208,47 +234,70 @@
 
     <!-- Today card: one place to answer today, no calendar hunt needed. -->
     <string name="tracker_today_label">TODAY</string>
-    <string name="tracker_today_pending">No entry yet — tap an answer</string>
-    <string name="tracker_today_recorded">Recorded as</string>
-    <string name="tracker_trend_title">Last 15 days</string>
+    <string name="tracker_today_question">How did today go?</string>
+    <string name="tracker_today_pending">Pick one answer below.</string>
+    <string name="tracker_today_recorded">Today: %1$s</string>
+    <string name="tracker_today_hint">Tap an answer. You can change it any time.</string>
+    <string name="tracker_trend_title">LAST 15 DAYS</string>
+    <string name="tracker_month_tools">Month tools</string>
+    <string name="tracker_month_tools_hide">Hide month tools</string>
     <string name="tracker_streak_breakdown_title">Streaks</string>
     <string name="tracker_streak_breakdown_body">Current run: %1$d · Longest run ever: %2$d</string>
-    <string name="tracker_streak_freeze">Freeze streak</string>
-    <string name="tracker_streak_freeze_desc">Pause the current-run display. Turn off to resume counting.</string>
-    <string name="tracker_streak_frozen_note">Streak frozen at %1$d day(s) — turn off to resume counting.</string>
+    <string name="tracker_streak_freeze">Pause the run number</string>
+    <string name="tracker_streak_freeze_desc">Your saved days and history never change.</string>
+    <string name="tracker_streak_frozen_note">Paused at %1$d day(s).</string>
 
     <!-- INNER FLAME: when it was kept, when it broke — always from real records. -->
-    <string name="tracker_flame_title">INNER FLAME</string>
-    <string name="tracker_flame_burning">Burning for %1$d day(s) — kept since %2$s</string>
-    <string name="tracker_flame_broken">Flame broke on %1$s</string>
+    <string name="tracker_flame_title">YOUR INNER FLAME</string>
+    <string name="tracker_flame_burning">Burning for %1$d day(s) in a row</string>
+    <string name="tracker_flame_since">Kept every day since %1$s</string>
+    <string name="tracker_flame_broken">Your flame is out</string>
+    <string name="tracker_flame_broken_on">It went out on %1$s</string>
+    <string name="tracker_flame_waiting">Your flame is waiting</string>
+    <string name="tracker_flame_waiting_hint">Answer today to light it.</string>
+    <string name="tracker_flame_saved_today">Today is saved. Your flame starts tomorrow.</string>
+    <string name="tracker_flame_relight">One clean day lights it again.</string>
+    <string name="tracker_flame_frozen">Run paused at %1$d day(s)</string>
+    <string name="tracker_flame_frozen_hint">Counting is paused. Your saved days are unchanged.</string>
     <string name="tracker_flame_last_break">Last break: %1$s</string>
-    <string name="tracker_flame_never_broke">No break recorded yet — the flame has been kept since your first entry.</string>
-    <string name="tracker_flame_history">Flame history — when you kept it</string>
-    <string name="tracker_flame_segment">%1$s → %2$s · %3$d day(s)</string>
-    <string name="tracker_flame_never_kept">No kept runs yet — answer a day to light the flame.</string>
-    <string name="tracker_daily_note">Daily note</string>
-    <string name="tracker_daily_note_hint">Optional private note for this day — never counted anywhere</string>
-    <string name="tracker_bulk_mark">Mark all of this month</string>
-    <string name="tracker_bulk_mark_confirm">Mark every day of this month as %1$s? Existing entries for that day are replaced.</string>
-    <string name="tracker_bulk_clear">Clear this month</string>
-    <string name="tracker_bulk_clear_confirm">Delete every entry of this month? This cannot be undone.</string>
+    <string name="tracker_flame_never_broke">No breaks yet — you have kept it every day.</string>
+    <string name="tracker_flame_history">WHEN YOU KEPT IT</string>
+    <string name="tracker_flame_segment">%1$s → %2$s</string>
+    <string name="tracker_flame_days">%1$d day(s)</string>
+    <string name="tracker_flame_never_kept">No kept days yet — answer a day to light the flame.</string>
+    <string name="tracker_daily_note">Note (optional)</string>
+    <string name="tracker_daily_note_hint">Only you can see this. It is never counted.</string>
+    <string name="tracker_bulk_mark">Fill the whole month</string>
+    <string name="tracker_bulk_mark_confirm">Mark every day of this month as “%1$s”? This replaces any answers already there.</string>
+    <string name="tracker_bulk_clear">Delete this month</string>
+    <string name="tracker_bulk_clear_confirm">Delete every answer in this month? This cannot be undone.</string>
     <string name="tracker_undo_last">Undo</string>
-    <string name="tracker_reminder_settings">Reminder</string>
-    <string name="tracker_reminder_time">Reminder time</string>
-    <string name="tracker_reminder_enabled">Daily check-in reminder</string>
-    <string name="tracker_export_csv">Export CSV</string>
-    <string name="tracker_export_hint">Share your tracker data as a CSV file</string>
-    <string name="tracker_export_failed">Export is not available right now</string>
+    <string name="tracker_reminder_settings">Daily reminder</string>
+    <string name="tracker_reminder_time">Remind me at</string>
+    <string name="tracker_reminder_enabled">Remind me every day</string>
+    <string name="tracker_reminder_help">A gentle reminder to check in.</string>
+    <string name="tracker_reminder_on_summary">Daily reminder at %1$s</string>
+    <string name="tracker_reminder_off_summary">Daily reminder is off</string>
+    <string name="tracker_more_title">SETTINGS</string>
+    <string name="tracker_more_subtitle">Reminder, pause and sharing</string>
+    <string name="tracker_hour">Hour</string>
+    <string name="tracker_minute">Minute</string>
+    <string name="tracker_cancel">Cancel</string>
+    <string name="tracker_confirm">Yes, do it</string>
+    <string name="tracker_export_csv">Share my history</string>
+    <string name="tracker_export_hint">Opens the share menu as a CSV file. Nothing leaves your phone until you pick an app.</string>
+    <string name="tracker_export_failed">Sharing is not available right now</string>
 
-    <string name="tracker_greeting">Good Morning!</string>
-    <string name="tracker_question">Kal masturbation kiya tha?</string>
-    <string name="tracker_date_hint">Date being recorded</string>
-    <string name="tracker_answer_yes">YES</string>
-    <string name="tracker_answer_no">NO</string>
-    <string name="tracker_answer_unknown">NOT SURE</string>
-    <string name="tracker_save_continue">SAVE &amp; CONTINUE</string>
-    <string name="tracker_later">LATER</string>
-    <string name="tracker_delete_record">Delete this entry</string>
+    <string name="tracker_greeting">Daily check-in</string>
+    <string name="tracker_question">How did that day go?</string>
+    <string name="tracker_checkin_hint">Staying clean keeps your inner flame alive.</string>
+    <string name="tracker_date_hint">Your answer will be saved for this date</string>
+    <string name="tracker_answer_yes">Slipped</string>
+    <string name="tracker_answer_no">Stayed clean</string>
+    <string name="tracker_answer_unknown">Not sure</string>
+    <string name="tracker_save_continue">Save</string>
+    <string name="tracker_later">Not now</string>
+    <string name="tracker_delete_record">Delete this answer</string>
 
     <!-- Privacy: the morning notification carries NO date, answer or streak. -->
     <string name="tracker_notification_channel">Daily check-in</string>

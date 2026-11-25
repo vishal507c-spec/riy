@@ -58,7 +58,7 @@ fun TrackerCheckInSheet(
     var note by remember(epochDay) { mutableStateOf(existingNote.orEmpty()) }
 
     SciFiFrame(
-        header = "RIY // INNER FLAME CHECK-IN",
+        header = "RIY",
         headerColor = SciFiColors.GoGreen,
         modifier = modifier,
     ) {
@@ -96,6 +96,14 @@ fun TrackerCheckInSheet(
                     style = typography.headlineSmall,
                     color = SciFiColors.NeonCyan,
                     fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.tracker_checkin_hint),
+                    style = typography.bodySmall,
+                    color = colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
                 )

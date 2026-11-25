@@ -10,7 +10,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,8 +38,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -51,26 +52,27 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.vishal.riy.R
 import com.vishal.riy.tracker.FlameSegment
-import com.vishal.riy.tracker.InsightTone
 import com.vishal.riy.tracker.TrackerCalendarDay
 import com.vishal.riy.tracker.TrackerDates
-import com.vishal.riy.tracker.TrackerInsight
-import com.vishal.riy.tracker.TrackerInsights
 import com.vishal.riy.tracker.TrackerStats
 import com.vishal.riy.tracker.TrackerStatus
 import com.vishal.riy.tracker.TrackerUiState
+import java.text.DateFormatSymbols
 import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Daily Tracker — a calm, data-honest screen. Every number comes from
- * [TrackerUiState]; nothing is sampled or invented. Green = NO, amber = YES,
- * grey = not recorded.
+ * Inner Flame — built around one question and three honest answers.
  *
- * Cognitive-load rules for this screen: one clear primary action (today's
- * answer) at the top, numbers grouped in one tight grid, one trend picture
- * instead of walls of text, destructive actions behind a confirmation, and
- * settings parked at the bottom out of the way.
+ * Reading order matches how a person actually thinks:
+ *   1. "How did today go?"  → answer right here
+ *   2. "Is my flame burning?" → when it was kept and when it broke
+ *   3. "How am I doing overall?" → three plain numbers and one picture
+ *   4. "What happened in this month?" → calendar
+ *   5. Settings (reminder, pause, sharing) stay closed at the bottom.
+ *
+ * Nothing here is a score, a level or a health claim. Every number is a count
+ * of real saved dates.
  */
 @Composable
 fun TrackerScreen(
@@ -95,7 +97,7 @@ fun TrackerScreen(
     modifier: Modifier = Modifier,
 ) {
     SciFiFrame(
-        header = "RIY // INNER FLAME",
+        header = "RIY",
         headerColor = SciFiColors.GoGreen,
         modifier = modifier,
     ) {
@@ -131,52 +133,13 @@ fun TrackerScreen(
 
             TodayCard(todayStatus = state.todayStatus, onSetToday = onSetToday)
 
-            FlameCard(
-                stats = state.stats,
-                onSetFreeze = onSetStreakFreeze,
-            )
+            FlameCard(stats = state.stats)
 
-            // Four real numbers as ONE calm surface — one card, not four.
-            SectionCard {
-                SectionLabel(stringResource(R.string.tracker_numbers_title))
-                Spacer(Modifier.height(12.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        MetricCell(
-                            label = stringResource(R.string.tracker_stat_no_days),
-                            value = state.stats.noDays,
-                            caption = stringResource(R.string.tracker_hint_no),
-                            accent = SciFiColors.GoGreen,
-                        )
-                        MetricCell(
-                            label = stringResource(R.string.tracker_stat_current_streak),
-                            value = state.stats.currentStreak,
-                            caption = stringResource(R.string.tracker_hint_current_streak),
-                            accent = SciFiColors.NeonCyan,
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        MetricCell(
-                            label = stringResource(R.string.tracker_stat_yes_days),
-                            value = state.stats.yesDays,
-                            caption = stringResource(R.string.tracker_hint_yes),
-                            accent = SciFiColors.SolarAmber,
-                        )
-                        MetricCell(
-                            label = stringResource(R.string.tracker_stat_longest_streak),
-                            value = state.stats.longestStreak,
-                            caption = stringResource(R.string.tracker_hint_longest_streak),
-                            accent = SciFiColors.NeonCyan,
-                        )
-                    }
-                }
-            }
+            JourneyCard(stats = state.stats)
 
-            TrackerStatusLine(state)
+            TrendCard(state)
 
             FlameHistoryCard(segments = state.stats.flameSegments)
-
-            TrendAndInsights(state)
 
             CalendarSection(
                 state = state,
@@ -187,32 +150,17 @@ fun TrackerScreen(
                 onClearMonth = onClearMonth,
             )
 
-            ReminderCard(
-                enabled = reminderEnabled,
-                hour = reminderHour,
-                minute = reminderMinute,
-                onEnabled = onReminderEnabled,
-                onHour = onReminderHour,
-                onMinute = onReminderMinute,
-            )
-
-            OutlinedButton(
-                onClick = onExportCsv,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = AppUI.CardRadius,
-            ) {
-                Text(
-                    text = stringResource(R.string.tracker_export_csv),
-                    style = typography.titleSmall,
-                    color = colorScheme.onSurface,
-                )
-            }
-            Text(
-                text = stringResource(R.string.tracker_export_hint),
-                style = typography.bodySmall,
-                color = colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
+            MoreCard(
+                reminderEnabled = reminderEnabled,
+                reminderHour = reminderHour,
+                reminderMinute = reminderMinute,
+                onReminderEnabled = onReminderEnabled,
+                onReminderHour = onReminderHour,
+                onReminderMinute = onReminderMinute,
+                streakFrozen = state.stats.streakFrozen,
+                frozenStreak = state.stats.frozenStreak,
+                onSetFreeze = onSetStreakFreeze,
+                onExportCsv = onExportCsv,
             )
         }
     }
@@ -244,138 +192,135 @@ private fun SavedBanner(onUndo: () -> Unit) {
 }
 
 /**
- * The one primary action on this screen: answer today, right now, without
- * hunting through the calendar. Three explicit buttons — no guessing what a
- * tap cycle would do.
+ * One question, three full-width answers. The answer is saved immediately, so
+ * there is no hidden save step and no tap-cycling to guess about.
  */
 @Composable
 private fun TodayCard(todayStatus: TrackerStatus?, onSetToday: (TrackerStatus?) -> Unit) {
     SectionCard(container = colorScheme.surfaceVariant) {
-        Text(
-            text = stringResource(R.string.tracker_today_label),
-            style = typography.labelLarge,
-            color = colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.SemiBold,
-        )
+        SectionLabel(stringResource(R.string.tracker_today_label))
         Spacer(Modifier.height(6.dp))
+        Text(
+            text = stringResource(R.string.tracker_today_question),
+            style = typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(4.dp))
         Text(
             text = if (todayStatus == null) {
                 stringResource(R.string.tracker_today_pending)
             } else {
-                stringResource(
-                    R.string.tracker_today_recorded,
-                    when (todayStatus) {
-                        TrackerStatus.NO -> stringResource(R.string.tracker_answer_no)
-                        TrackerStatus.YES -> stringResource(R.string.tracker_answer_yes)
-                        TrackerStatus.UNKNOWN -> stringResource(R.string.tracker_answer_unknown)
-                    },
-                )
+                stringResource(R.string.tracker_today_recorded, statusWord(todayStatus))
             },
-            style = typography.titleMedium,
-            color = if (todayStatus == null) colorScheme.onSurfaceVariant else colorScheme.onSurface,
-            fontWeight = FontWeight.Medium,
+            style = typography.bodyMedium,
+            color = colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TodayAnswerPill(
-                label = stringResource(R.string.tracker_answer_no),
-                accent = SciFiColors.GoGreen,
-                selected = todayStatus == TrackerStatus.NO,
-                onClick = { onSetToday(if (todayStatus == TrackerStatus.NO) null else TrackerStatus.NO) },
-            )
-            TodayAnswerPill(
-                label = stringResource(R.string.tracker_answer_yes),
-                accent = SciFiColors.SolarAmber,
-                selected = todayStatus == TrackerStatus.YES,
-                onClick = { onSetToday(if (todayStatus == TrackerStatus.YES) null else TrackerStatus.YES) },
-            )
-            TodayAnswerPill(
-                label = stringResource(R.string.tracker_answer_unknown),
-                accent = SciFiColors.Telemetry,
-                selected = todayStatus == TrackerStatus.UNKNOWN,
-                onClick = { onSetToday(if (todayStatus == TrackerStatus.UNKNOWN) null else TrackerStatus.UNKNOWN) },
-            )
-        }
+
+        TodayAnswerRow(
+            label = stringResource(R.string.tracker_answer_no),
+            accent = SciFiColors.GoGreen,
+            selected = todayStatus == TrackerStatus.NO,
+            onClick = { onSetToday(if (todayStatus == TrackerStatus.NO) null else TrackerStatus.NO) },
+        )
+        Spacer(Modifier.height(8.dp))
+        TodayAnswerRow(
+            label = stringResource(R.string.tracker_answer_yes),
+            accent = SciFiColors.SolarAmber,
+            selected = todayStatus == TrackerStatus.YES,
+            onClick = { onSetToday(if (todayStatus == TrackerStatus.YES) null else TrackerStatus.YES) },
+        )
+        Spacer(Modifier.height(8.dp))
+        TodayAnswerRow(
+            label = stringResource(R.string.tracker_answer_unknown),
+            accent = SciFiColors.Telemetry,
+            selected = todayStatus == TrackerStatus.UNKNOWN,
+            onClick = { onSetToday(if (todayStatus == TrackerStatus.UNKNOWN) null else TrackerStatus.UNKNOWN) },
+        )
+
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = stringResource(R.string.tracker_today_hint),
+            style = typography.bodySmall,
+            color = colorScheme.onSurfaceVariant,
+        )
     }
 }
 
 @Composable
-private fun RowScope.TodayAnswerPill(
+private fun TodayAnswerRow(
     label: String,
     accent: Color,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    Box(
+    Row(
         modifier = Modifier
-            .weight(1f)
-            .height(46.dp)
+            .fillMaxWidth()
+            .height(48.dp)
             .background(
-                if (selected) accent.copy(alpha = 0.22f) else colorScheme.surface,
-                AppUI.PillRadius,
+                if (selected) accent.copy(alpha = 0.20f) else colorScheme.surface,
+                AppUI.CardRadius,
             )
             .border(
                 1.dp,
                 if (selected) accent else colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
-                AppUI.PillRadius,
+                AppUI.CardRadius,
             )
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            Modifier
+                .size(12.dp)
+                .background(if (selected) accent else colorScheme.onSurfaceVariant.copy(alpha = 0.35f), CircleShape),
+        )
+        Spacer(Modifier.width(12.dp))
         Text(
             text = label,
             style = typography.titleSmall,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
             color = if (selected) accent else colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
         )
-    }
-}
-
-@Composable
-private fun TrackerStatusLine(state: TrackerUiState) {
-    val stats = state.stats
-    val text = when {
-        stats.recordedDays == 0 -> stringResource(R.string.tracker_status_empty)
-        stats.latestRecordedDay != null -> stringResource(
-            R.string.tracker_status_summary,
-            stats.recordedDays,
-            TrackerDates.formatDate(stats.latestRecordedDay, TimeZone.getDefault()),
-            TrackerDates.formatDate(stats.trackingStartDay!!, TimeZone.getDefault()),
-        )
-        else -> stringResource(R.string.tracker_status_empty)
-    }
-    SectionCard(container = if (stats.recordedDays == 0) colorScheme.surfaceVariant
-    else SciFiColors.GoGreen.copy(alpha = 0.12f)) {
-        Text(text = text, style = typography.bodyMedium, color = colorScheme.onSurface)
+        if (selected) {
+            Text(text = "✓", style = typography.titleMedium, color = accent)
+        }
     }
 }
 
 /**
- * The INNER FLAME hero: when the flame is burning (kept since), when it last
- * broke, and the freeze pause. The dates are real record dates — the user
- * always sees exactly when the flame was kept and when it went out.
+ * The flame status: when it was kept, when it last broke, and the optional
+ * pause. Every date is a real record date. A frozen run is shown as paused —
+ * never as still burning — so the display can never lie.
  */
 @Composable
-private fun FlameCard(
-    stats: TrackerStats,
-    onSetFreeze: (Boolean) -> Unit,
-) {
-    val tz = TimeZone.getDefault()
-    val alive = stats.currentStreak > 0
-    // Smoothly animate the flame's mood so a break or a repair feels like a
-    // state change, not a jump cut.
+private fun FlameCard(stats: TrackerStats) {
+    val frozen = stats.streakFrozen && stats.frozenStreak > 0
+    val alive = !frozen && stats.currentStreak > 0
+    val hasRecords = stats.recordedDays > 0
     val accent by animateColorAsState(
-        targetValue = if (alive) SciFiColors.GoGreen else SciFiColors.SolarAmber,
+        targetValue = when {
+            frozen -> SciFiColors.NeonCyan
+            alive -> SciFiColors.GoGreen
+            else -> SciFiColors.SolarAmber
+        },
         animationSpec = tween(450),
         label = "flameAccent",
     )
     val container by animateColorAsState(
-        targetValue = if (alive) SciFiColors.GoGreen.copy(alpha = 0.12f)
-        else SciFiColors.SolarAmber.copy(alpha = 0.12f),
+        targetValue = when {
+            frozen -> SciFiColors.NeonCyan.copy(alpha = 0.12f)
+            alive -> SciFiColors.GoGreen.copy(alpha = 0.12f)
+            hasRecords -> SciFiColors.SolarAmber.copy(alpha = 0.12f)
+            else -> colorScheme.surfaceVariant
+        },
         animationSpec = tween(450),
         label = "flameContainer",
     )
-    // A living flame breathes; a broken one still.
+    // A living flame breathes; a paused or broken one stays still.
     val infinite = rememberInfiniteTransition(label = "flamePulse")
     val pulse by infinite.animateFloat(
         initialValue = 0.94f,
@@ -383,10 +328,16 @@ private fun FlameCard(
         animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
         label = "flameScale",
     )
+
     SectionCard(container = container) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = if (alive) "🔥" else "💔",
+                text = when {
+                    frozen -> "⏸️"
+                    alive -> "🔥"
+                    hasRecords -> "💔"
+                    else -> "🕯️"
+                },
                 style = typography.headlineMedium,
                 modifier = Modifier.graphicsLayer {
                     scaleX = pulse
@@ -402,16 +353,11 @@ private fun FlameCard(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = if (alive) {
-                        stringResource(
-                            R.string.tracker_flame_burning,
-                            stats.currentStreak,
-                            TrackerDates.formatDate(stats.flameStartDay!!, tz),
-                        )
-                    } else {
-                        stats.lastBreakDay?.let {
-                            stringResource(R.string.tracker_flame_broken, TrackerDates.formatDate(it, tz))
-                        } ?: stringResource(R.string.tracker_flame_never_kept)
+                    text = when {
+                        frozen -> stringResource(R.string.tracker_flame_frozen, stats.frozenStreak)
+                        alive -> stringResource(R.string.tracker_flame_burning, stats.currentStreak)
+                        hasRecords && stats.lastBreakDay != null -> stringResource(R.string.tracker_flame_broken)
+                        else -> stringResource(R.string.tracker_flame_waiting)
                     },
                     style = typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -422,77 +368,253 @@ private fun FlameCard(
 
         Spacer(Modifier.height(8.dp))
         Text(
-            text = stats.lastBreakDay?.let {
-                stringResource(R.string.tracker_flame_last_break, TrackerDates.formatDate(it, tz))
-            } ?: stringResource(R.string.tracker_flame_never_broke),
-            style = typography.bodySmall,
+            text = when {
+                frozen -> stringResource(R.string.tracker_flame_frozen_hint)
+                alive -> stringResource(
+                    R.string.tracker_flame_since,
+                    friendlyDate(stats.flameStartDay!!),
+                )
+                hasRecords && stats.lastBreakDay != null -> stringResource(
+                    R.string.tracker_flame_broken_on,
+                    friendlyDate(stats.lastBreakDay),
+                )
+                hasRecords -> stringResource(R.string.tracker_flame_saved_today)
+                else -> stringResource(R.string.tracker_flame_waiting_hint)
+            },
+            style = typography.bodyMedium,
             color = colorScheme.onSurfaceVariant,
         )
-        if (stats.streakFrozen && stats.frozenStreak > 0) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = stringResource(R.string.tracker_streak_frozen_note, stats.frozenStreak),
-                style = typography.bodySmall,
-                color = SciFiColors.NeonCyan,
-            )
-        }
 
-        Spacer(Modifier.height(10.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
+        when {
+            alive -> {
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = stringResource(R.string.tracker_streak_freeze),
-                    style = typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = stringResource(R.string.tracker_streak_freeze_desc),
+                    text = stats.lastBreakDay?.let {
+                        stringResource(R.string.tracker_flame_last_break, friendlyDate(it))
+                    } ?: stringResource(R.string.tracker_flame_never_broke),
                     style = typography.bodySmall,
                     color = colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(Modifier.width(12.dp))
-            Switch(checked = stats.streakFrozen, onCheckedChange = onSetFreeze)
+            hasRecords && !frozen -> {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.tracker_flame_relight),
+                    style = typography.bodySmall,
+                    color = accent,
+                )
+            }
         }
     }
 }
 
-/** Recent flame runs, so "when did I keep it" is visible at a glance. */
+/** Three real numbers, no duplicates of the flame card above. */
+@Composable
+private fun JourneyCard(stats: TrackerStats) {
+    SectionCard {
+        SectionLabel(stringResource(R.string.tracker_numbers_title))
+        Spacer(Modifier.height(12.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            JourneyStat(
+                value = stats.noDays,
+                label = stringResource(R.string.tracker_stat_no_days),
+                accent = SciFiColors.GoGreen,
+            )
+            JourneyStat(
+                value = stats.yesDays,
+                label = stringResource(R.string.tracker_stat_yes_days),
+                accent = SciFiColors.SolarAmber,
+            )
+            JourneyStat(
+                value = stats.longestStreak,
+                label = stringResource(R.string.tracker_stat_longest_streak),
+                accent = SciFiColors.NeonCyan,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = stringResource(R.string.tracker_journey_recorded, stats.recordedDays),
+            style = typography.bodySmall,
+            color = colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = stringResource(R.string.tracker_journey_best_hint),
+            style = typography.bodySmall,
+            color = colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun RowScope.JourneyStat(value: Int, label: String, accent: Color) {
+    Column(
+        modifier = Modifier.weight(1f),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = value.toString(),
+            style = typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = accent,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = label,
+            style = typography.labelSmall,
+            color = colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/** One picture and one colour key — no duplicate ribbon and no chip wall. */
+@Composable
+private fun TrendCard(state: TrackerUiState) {
+    SectionCard {
+        SectionLabel(stringResource(R.string.tracker_trend_title))
+        Spacer(Modifier.height(12.dp))
+        if (state.recentStatuses.isEmpty()) {
+            Text(
+                text = stringResource(R.string.tracker_flame_never_kept),
+                style = typography.bodySmall,
+                color = colorScheme.onSurfaceVariant,
+            )
+        } else {
+            TrendChart(statuses = state.recentStatuses + state.todayStatus)
+            Spacer(Modifier.height(6.dp))
+            TrendChartLabels()
+            Spacer(Modifier.height(10.dp))
+            StatusLegend()
+        }
+    }
+}
+
+/** The colour key, in words anybody can read. */
+@Composable
+private fun StatusLegend() {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LegendItem(SciFiColors.GoGreen, stringResource(R.string.tracker_legend_clean))
+            LegendItem(SciFiColors.SolarAmber, stringResource(R.string.tracker_legend_slipped))
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LegendItem(SciFiColors.Telemetry, stringResource(R.string.tracker_legend_not_sure))
+            LegendItem(
+                colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                stringResource(R.string.tracker_legend_no_answer),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LegendItem(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).background(color, CircleShape))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = typography.labelSmall,
+            color = colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** A 15-day strip: filled bar = answered, small tick = no answer yet. */
+@Composable
+private fun TrendChart(statuses: List<TrackerStatus?>) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+    ) {
+        if (statuses.isEmpty()) return@Canvas
+        val slot = size.width / statuses.size
+        val barWidth = slot * 0.64f
+        statuses.forEachIndexed { index, status ->
+            val left = index * slot + (slot - barWidth) / 2f
+            if (status == null) {
+                drawRoundRect(
+                    color = Color.White.copy(alpha = 0.14f),
+                    topLeft = Offset(left, size.height - 5f),
+                    size = Size(barWidth, 5f),
+                    cornerRadius = CornerRadius(2f, 2f),
+                )
+            } else {
+                val color = when (status) {
+                    TrackerStatus.NO -> SciFiColors.GoGreen
+                    TrackerStatus.YES -> SciFiColors.SolarAmber
+                    TrackerStatus.UNKNOWN -> SciFiColors.Telemetry
+                }
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(left, 0f),
+                    size = Size(barWidth, size.height),
+                    cornerRadius = CornerRadius(3f, 3f),
+                )
+            }
+        }
+    }
+}
+
+/** Where the strip starts and ends — removes all guesswork from the chart. */
+@Composable
+private fun TrendChartLabels() {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(
+            text = stringResource(R.string.tracker_trend_start),
+            style = typography.labelSmall,
+            color = colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = stringResource(R.string.tracker_trend_end),
+            style = typography.labelSmall,
+            color = colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** "When did I keep it" — real kept runs, newest first. */
 @Composable
 private fun FlameHistoryCard(segments: List<FlameSegment>) {
     if (segments.isEmpty()) return
-    val tz = TimeZone.getDefault()
     SectionCard {
         SectionLabel(stringResource(R.string.tracker_flame_history))
-        Spacer(Modifier.height(8.dp))
-        segments.forEach { segment ->
+        Spacer(Modifier.height(10.dp))
+        segments.forEachIndexed { index, segment ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "🔥",
-                    style = typography.bodyMedium,
-                )
+                Box(Modifier.size(8.dp).background(SciFiColors.GoGreen, CircleShape))
                 Spacer(Modifier.width(10.dp))
                 Text(
                     text = stringResource(
                         R.string.tracker_flame_segment,
-                        TrackerDates.formatDate(segment.startDay, tz),
-                        TrackerDates.formatDate(segment.endDay, tz),
-                        segment.length,
+                        friendlyDate(segment.startDay),
+                        friendlyDate(segment.endDay),
                     ),
                     style = typography.bodyMedium,
                     color = colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
+                Text(
+                    text = stringResource(R.string.tracker_flame_days, segment.length),
+                    style = typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = SciFiColors.GoGreen,
+                )
             }
-            Spacer(Modifier.height(6.dp))
+            if (index != segments.lastIndex) Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -506,6 +628,7 @@ private fun CalendarSection(
     onBulkMark: (TrackerStatus) -> Unit,
     onClearMonth: () -> Unit,
 ) {
+    var showTools by remember { mutableStateOf(false) }
     SectionCard {
         SectionLabel(stringResource(R.string.tracker_calendar_header))
         Spacer(Modifier.height(10.dp))
@@ -548,12 +671,24 @@ private fun CalendarSection(
             }
         }
 
-        Spacer(Modifier.height(14.dp))
-        BulkActions(onBulkMark = onBulkMark, onClearMonth = onClearMonth)
-
         Spacer(Modifier.height(12.dp))
+        TextButton(onClick = { showTools = !showTools }) {
+            Text(
+                text = stringResource(
+                    if (showTools) R.string.tracker_month_tools_hide else R.string.tracker_month_tools,
+                ),
+                style = typography.titleSmall,
+                color = colorScheme.primary,
+            )
+        }
+        if (showTools) {
+            Spacer(Modifier.height(6.dp))
+            BulkActions(onBulkMark = onBulkMark, onClearMonth = onClearMonth)
+        }
+
+        Spacer(Modifier.height(8.dp))
         Text(
-            text = stringResource(R.string.tracker_legend),
+            text = stringResource(R.string.tracker_calendar_hint),
             style = typography.bodySmall,
             color = colorScheme.onSurfaceVariant,
         )
@@ -566,7 +701,11 @@ private fun BulkActions(onBulkMark: (TrackerStatus) -> Unit, onClearMonth: () ->
     val pendingMark = remember { mutableStateOf<TrackerStatus?>(null) }
     val pendingClear = remember { mutableStateOf(false) }
 
-    SectionLabel(stringResource(R.string.tracker_bulk_mark))
+    Text(
+        text = stringResource(R.string.tracker_bulk_mark),
+        style = typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+    )
     Spacer(Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         BulkChip(label = stringResource(R.string.tracker_answer_no), accent = SciFiColors.GoGreen) {
@@ -593,24 +732,26 @@ private fun BulkActions(onBulkMark: (TrackerStatus) -> Unit, onClearMonth: () ->
     }
 
     pendingMark.value?.let { status ->
-        val label = when (status) {
-            TrackerStatus.NO -> stringResource(R.string.tracker_answer_no)
-            TrackerStatus.YES -> stringResource(R.string.tracker_answer_yes)
-            TrackerStatus.UNKNOWN -> stringResource(R.string.tracker_answer_unknown)
-        }
         AlertDialog(
             onDismissRequest = { pendingMark.value = null },
             title = { Text(stringResource(R.string.tracker_bulk_mark)) },
-            text = { Text(stringResource(R.string.tracker_bulk_mark_confirm, label)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.tracker_bulk_mark_confirm,
+                        statusWord(status),
+                    ),
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     pendingMark.value = null
                     onBulkMark(status)
-                }) { Text(stringResource(R.string.tracker_save_continue)) }
+                }) { Text(stringResource(R.string.tracker_confirm)) }
             },
             dismissButton = {
                 TextButton(onClick = { pendingMark.value = null }) {
-                    Text(stringResource(R.string.tracker_later))
+                    Text(stringResource(R.string.tracker_cancel))
                 }
             },
         )
@@ -625,11 +766,11 @@ private fun BulkActions(onBulkMark: (TrackerStatus) -> Unit, onClearMonth: () ->
                 TextButton(onClick = {
                     pendingClear.value = false
                     onClearMonth()
-                }) { Text(stringResource(R.string.tracker_save_continue)) }
+                }) { Text(stringResource(R.string.tracker_confirm)) }
             },
             dismissButton = {
                 TextButton(onClick = { pendingClear.value = false }) {
-                    Text(stringResource(R.string.tracker_later))
+                    Text(stringResource(R.string.tracker_cancel))
                 }
             },
         )
@@ -643,9 +784,14 @@ private fun BulkChip(label: String, accent: Color, onClick: () -> Unit) {
             .background(accent.copy(alpha = 0.18f), AppUI.PillRadius)
             .border(1.dp, accent.copy(alpha = 0.6f), AppUI.PillRadius)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Text(text = label, style = typography.titleSmall, fontWeight = FontWeight.SemiBold, color = accent)
+        Text(
+            text = label,
+            style = typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = accent,
+        )
     }
 }
 
@@ -711,57 +857,149 @@ private fun RowScope.DayCell(day: TrackerCalendarDay, onClick: () -> Unit) {
 private fun dayOfMonthLabel(epochDay: Long): String =
     TrackerDates.civilFromDays(epochDay).third.toString()
 
-/**
- * One trend picture instead of two ribbons and a wall of numbers: the last
- * 15 days as bars, plus the same honest insight counts as before.
- */
+/** Reminder, streak pause and sharing — closed by default, out of the way. */
 @Composable
-private fun TrendAndInsights(state: TrackerUiState) {
-    val recent = state.recentStatuses
+private fun MoreCard(
+    reminderEnabled: Boolean,
+    reminderHour: Int,
+    reminderMinute: Int,
+    onReminderEnabled: (Boolean) -> Unit,
+    onReminderHour: (Int) -> Unit,
+    onReminderMinute: (Int) -> Unit,
+    streakFrozen: Boolean,
+    frozenStreak: Int,
+    onSetFreeze: (Boolean) -> Unit,
+    onExportCsv: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
     SectionCard {
-        SectionLabel(stringResource(R.string.tracker_insights_title))
-        Spacer(Modifier.height(12.dp))
-
-        if (recent.isNotEmpty()) {
-            Text(
-                text = stringResource(R.string.tracker_week_title),
-                style = typography.labelSmall,
-                color = colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(6.dp))
-            StatusRibbon(recent.takeLast(7))
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.tracker_trend_title),
-                style = typography.labelSmall,
-                color = colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(6.dp))
-            TrendChart(statuses = recent + state.todayStatus)
-            Spacer(Modifier.height(4.dp))
-            TrendChartLabels()
-            Spacer(Modifier.height(12.dp))
-        }
-
-        val insights = TrackerInsights.all(state.stats, recent, state.todayStatus)
-        Spacer(Modifier.height(4.dp))
-        // One swipeable row instead of five stacked rows: the same honest
-        // numbers, far less vertical noise.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .clickable { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            insights.forEach { insight ->
-                InsightChip(insight = insight)
+            Column(modifier = Modifier.weight(1f)) {
+                SectionLabel(stringResource(R.string.tracker_more_title))
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = if (reminderEnabled) {
+                        stringResource(
+                            R.string.tracker_reminder_on_summary,
+                            formatTime(reminderHour, reminderMinute),
+                        )
+                    } else {
+                        stringResource(R.string.tracker_reminder_off_summary)
+                    },
+                    style = typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(R.string.tracker_more_subtitle),
+                    style = typography.bodySmall,
+                    color = colorScheme.onSurfaceVariant,
+                )
             }
+            Text(
+                text = if (expanded) "−" else "+",
+                style = typography.headlineSmall,
+                color = SciFiColors.NeonCyan,
+            )
         }
 
-        if (state.stats.unrecordedDays > 0) {
-            Spacer(Modifier.height(12.dp))
+        if (expanded) {
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.tracker_reminder_settings),
+                        style = typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = stringResource(R.string.tracker_reminder_help),
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(checked = reminderEnabled, onCheckedChange = onReminderEnabled)
+            }
+            if (reminderEnabled) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = stringResource(R.string.tracker_reminder_time),
+                    style = typography.bodySmall,
+                    color = colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TimeStepper(
+                        label = stringResource(R.string.tracker_hour),
+                        value = reminderHour,
+                        onDecrease = { onReminderHour((reminderHour + 23) % 24) },
+                        onIncrease = { onReminderHour((reminderHour + 1) % 24) },
+                    )
+                    TimeStepper(
+                        label = stringResource(R.string.tracker_minute),
+                        value = reminderMinute,
+                        onDecrease = { onReminderMinute((reminderMinute + 59) % 60) },
+                        onIncrease = { onReminderMinute((reminderMinute + 1) % 60) },
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.tracker_streak_freeze),
+                        style = typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = stringResource(R.string.tracker_streak_freeze_desc),
+                        style = typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(checked = streakFrozen, onCheckedChange = onSetFreeze)
+            }
+            if (streakFrozen) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.tracker_streak_frozen_note, frozenStreak),
+                    style = typography.bodySmall,
+                    color = SciFiColors.NeonCyan,
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = onExportCsv,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = AppUI.CardRadius,
+            ) {
+                Text(
+                    text = stringResource(R.string.tracker_export_csv),
+                    style = typography.titleSmall,
+                    color = colorScheme.onSurface,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
             Text(
-                text = stringResource(R.string.tracker_unrecorded_note, state.stats.unrecordedDays),
+                text = stringResource(R.string.tracker_export_hint),
                 style = typography.bodySmall,
                 color = colorScheme.onSurfaceVariant,
             )
@@ -770,179 +1008,69 @@ private fun TrendAndInsights(state: TrackerUiState) {
 }
 
 @Composable
-private fun InsightChip(insight: TrackerInsight) {
-    val valueColor = when (insight.tone) {
-        InsightTone.GOOD -> SciFiColors.GoGreen
-        InsightTone.NEUTRAL -> SciFiColors.SolarAmber
-        InsightTone.QUIET -> colorScheme.onSurface
-    }
-    Column(
-        modifier = Modifier
-            .background(colorScheme.surface, AppUI.PillRadius)
-            .border(1.dp, colorScheme.onSurfaceVariant.copy(alpha = 0.25f), AppUI.PillRadius)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-    ) {
-        Text(
-            text = stringResource(insight.labelRes),
-            style = typography.labelSmall,
-            color = colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = insight.value,
-            style = typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = valueColor,
-        )
-    }
-}
-
-/** A 15-day bar strip: one glance instead of reading two text ribbons. */
-@Composable
-private fun TrendChart(statuses: List<TrackerStatus?>) {
-    Canvas(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp),
-    ) {
-        val barWidth = size.width / statuses.size
-        statuses.forEachIndexed { index, status ->
-            val color = when (status) {
-                TrackerStatus.NO -> SciFiColors.GoGreen
-                TrackerStatus.YES -> SciFiColors.SolarAmber
-                TrackerStatus.UNKNOWN -> SciFiColors.Telemetry
-                null -> Color.White.copy(alpha = 0.12f)
-            }
-            drawRect(
-                color = color,
-                topLeft = Offset(index * barWidth, 0f),
-                size = Size(barWidth * 0.72f, size.height),
-            )
-        }
-        // Faint baseline so unrecorded days read as "empty", not as bars.
-        drawRect(
-            color = Color.White.copy(alpha = 0.10f),
-            topLeft = Offset(0f, size.height - 2f),
-            size = Size(size.width, 2f),
-        )
-    }
-}
-
-/** Where the strip starts and ends — removes all guesswork from the chart. */
-@Composable
-private fun TrendChartLabels() {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(
-            text = stringResource(R.string.tracker_trend_start),
-            style = typography.labelSmall,
-            color = colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = stringResource(R.string.tracker_trend_end),
-            style = typography.labelSmall,
-            color = colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun StatusRibbon(statuses: List<TrackerStatus?>) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        statuses.forEach { status ->
-            val color = when (status) {
-                TrackerStatus.NO -> SciFiColors.GoGreen
-                TrackerStatus.YES -> SciFiColors.SolarAmber
-                TrackerStatus.UNKNOWN -> SciFiColors.Telemetry
-                null -> colorScheme.surface
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(color.copy(alpha = if (status == null) 1f else 0.55f), CircleShape)
-                    .height(10.dp),
-            )
-        }
-    }
-}
-
-/** Reminder time stepper, parked at the bottom so it never interrupts logging. */
-@Composable
-private fun ReminderCard(
-    enabled: Boolean,
-    hour: Int,
-    minute: Int,
-    onEnabled: (Boolean) -> Unit,
-    onHour: (Int) -> Unit,
-    onMinute: (Int) -> Unit,
-) {
-    SectionCard {
-        SectionLabel(stringResource(R.string.tracker_reminder_settings))
-        Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.tracker_reminder_enabled),
-                    style = typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = stringResource(R.string.tracker_reminder_time),
-                    style = typography.bodySmall,
-                    color = colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Switch(checked = enabled, onCheckedChange = onEnabled)
-        }
-        if (enabled) {
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                TimeStepper(
-                    label = "HH",
-                    value = hour,
-                    onDecrease = { onHour((hour + 23) % 24) },
-                    onIncrease = { onHour((hour + 1) % 24) },
-                )
-                TimeStepper(
-                    label = "MM",
-                    value = minute,
-                    onDecrease = { onMinute((minute + 59) % 60) },
-                    onIncrease = { onMinute((minute + 1) % 60) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun TimeStepper(label: String, value: Int, onDecrease: () -> Unit, onIncrease: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = label,
             style = typography.labelSmall,
             color = colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(end = 6.dp),
         )
-        TextButton(onClick = onDecrease) {
-            Text(text = "−", style = typography.titleMedium, color = colorScheme.primary)
-        }
-        Text(
-            text = String.format(Locale.US, "%02d", value),
-            style = typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = colorScheme.onSurface,
-        )
-        TextButton(onClick = onIncrease) {
-            Text(text = "+", style = typography.titleMedium, color = colorScheme.primary)
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StepButton("−", onDecrease)
+            Text(
+                text = String.format(Locale.US, "%02d", value),
+                style = typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(34.dp),
+            )
+            StepButton("+", onIncrease)
         }
     }
 }
 
+@Composable
+private fun StepButton(symbol: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .background(colorScheme.primaryContainer, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = symbol, style = typography.titleMedium, color = colorScheme.primary)
+    }
+}
+
+@Composable
+private fun statusWord(status: TrackerStatus): String = when (status) {
+    TrackerStatus.NO -> stringResource(R.string.tracker_answer_no)
+    TrackerStatus.YES -> stringResource(R.string.tracker_answer_yes)
+    TrackerStatus.UNKNOWN -> stringResource(R.string.tracker_answer_unknown)
+}
+
 private fun monthLabel(epochDay: Long): String {
     val (year, month, _) = TrackerDates.civilFromDays(epochDay)
-    val name = java.text.DateFormatSymbols(Locale.US).getShortMonths().getOrNull(month - 1).orEmpty()
+    val name = DateFormatSymbols(Locale.US).getShortMonths().getOrNull(month - 1).orEmpty()
     return "$name $year".uppercase(Locale.US)
+}
+
+/** Friendly date: "24 Nov 2026" instead of a bare number string. */
+private fun friendlyDate(epochDay: Long): String {
+    val (year, month, day) = TrackerDates.civilFromDays(epochDay)
+    val name = DateFormatSymbols(Locale.US).getShortMonths().getOrNull(month - 1).orEmpty()
+    return "$day $name $year"
+}
+
+/** "9:00 AM" — how a person says a reminder time. */
+private fun formatTime(hour: Int, minute: Int): String {
+    val displayHour = when {
+        hour == 0 -> 12
+        hour > 12 -> hour - 12
+        else -> hour
+    }
+    val suffix = if (hour < 12) "AM" else "PM"
+    return String.format(Locale.US, "%d:%02d %s", displayHour, minute, suffix)
 }

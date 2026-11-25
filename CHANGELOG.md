@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.6.0 - 2026-11-25
+- Plain-language redesign of both main pages so anyone can understand them at a glance.
+- **Shield page**: one honest status card, one button only when attention is needed, a simple "What's working" list (adult websites + calls/Telegram) and the daily-tracker entry. Every technical check (phone protection, app limits, website blocking, system check, the six shield layers and the four-step pipeline) moved behind a single "See every check" toggle that is closed by default. Status wording rewritten in plain words ("Adult websites are blocked", "You slipped, so apps are paused for 2 hours", "Protection needs a check", etc.).
+- **Inner Flame page**: today's answer is now three full-width buttons ("Stayed clean / Slipped / Not sure") right under the question "How did today go?"; the flame card answers "when did I keep it and when did it break" with real dates; one "Your journey" card with three plain numbers (days clean, days slipped, best run); one 15-day picture with a colour key; the flame history ("when you kept it"); and a month calendar whose bulk actions are hidden behind "Month tools". Reminder, streak pause and sharing live in a closed-by-default "Settings" card.
+- Status words and the legend now use plain language ("Stayed clean / Slipped / Not sure / No answer" instead of YES/NO), and the calendar legend moved next to the calendar.
+- Freeze is now a real pause: the run number is captured when you pause it and displayed as "Run paused at N days", while the live streak keeps being computed honestly. Nothing is invented.
+- The check-in screen now asks "How did that day go?" with the same plain answers, and every date is shown more gently.
+
 ## v3.5.1 - 2026-11-25
 - Deeper UX polish for Inner Flame: the four metric tiles are now ONE grouped "Your numbers" card (four competing surfaces became one calm surface, and a duplicated caption line was removed), insights became a single swipeable chip row instead of five stacked rows, the trend chart gained a faint baseline plus "15 days ago → Today" labels, the legend moved next to the calendar where it is needed, and today's calendar cell gets a bright cyan ring so positioning in the month is instant.
 - The flame now feels alive: 🔥 breathes with a gentle pulse while the flame is burning, stays still when broken, and the card's colours animate smoothly between kept and broken states.

@@ -77,7 +77,12 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
         val tz = TimeZone.getDefault()
         val today = TrackerDates.today(now, tz)
         val records = store.all()
-        val stats = TrackerCalculator.compute(records, today, store.streakFreeze)
+        val stats = TrackerCalculator.compute(
+            records,
+            today,
+            store.streakFreeze,
+            store.streakFreezeValue,
+        )
         val anchor = _state.value.monthAnchor.takeIf { it != 0L } ?: today
         val monthStart = TrackerDates.firstOfMonth(anchor)
         val monthLength = TrackerDates.lengthOfMonth(anchor)
@@ -215,6 +220,11 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
      * visible; disabling resumes counting from real records.
      */
     fun setStreakFreeze(value: Boolean) {
+        if (value) {
+            val today = TrackerDates.today(System.currentTimeMillis(), TimeZone.getDefault())
+            val current = TrackerCalculator.compute(store.all(), today).currentStreak
+            store.streakFreezeValue = current
+        }
         store.streakFreeze = value
         refresh()
     }

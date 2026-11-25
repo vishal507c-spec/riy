@@ -99,6 +99,7 @@ object TrackerCalculator {
         records: List<TrackerDay>,
         todayEpochDay: Long,
         streakFrozen: Boolean = false,
+        frozenStreakValue: Int? = null,
     ): TrackerStats {
         // Last write wins per date: this makes the calculation independent of
         // the order the caller happens to supply records in, and guarantees one
@@ -112,7 +113,10 @@ object TrackerCalculator {
         }
         if (byDay.isEmpty()) {
             // Still surface the freeze state honestly, with zero counts.
-            return TrackerStats.EMPTY.copy(streakFrozen = streakFrozen)
+            return TrackerStats.EMPTY.copy(
+                streakFrozen = streakFrozen,
+                frozenStreak = if (streakFrozen) frozenStreakValue ?: 0 else 0,
+            )
         }
 
         val yes = byDay.values.count { it.status == TrackerStatus.YES }
@@ -151,7 +155,7 @@ object TrackerCalculator {
             longestStreak = longest,
             trackingStartDay = start,
             latestRecordedDay = latest,
-            frozenStreak = if (streakFrozen) current else 0,
+            frozenStreak = if (streakFrozen) frozenStreakValue ?: current else 0,
             streakFrozen = streakFrozen,
             flameStartDay = flameStart,
             lastBreakDay = lastBreak,
