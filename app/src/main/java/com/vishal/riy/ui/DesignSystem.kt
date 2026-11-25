@@ -108,14 +108,24 @@ fun StatusLine(label: String, detail: String, color: Color) {
 @Composable
 fun MetricTile(label: String, value: Int, caption: String, accent: Color) {
     SectionCard {
-        Text(text = label, style = typography.labelMedium, color = colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(text = value.toString(), style = typography.headlineMedium, fontWeight = FontWeight.Bold, color = accent)
-            Spacer(Modifier.width(6.dp))
-            Text(text = caption, style = typography.bodySmall, color = colorScheme.onSurfaceVariant)
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(text = caption, style = typography.bodySmall, color = colorScheme.onSurfaceVariant)
+        MetricCell(label = label, value = value, caption = caption, accent = accent)
     }
+}
+
+/**
+ * Borderless metric cell — used inside a single grouped card so the dashboard
+ * shows four numbers as ONE calm surface instead of four competing cards.
+ */
+@Composable
+fun MetricCell(label: String, value: Int, caption: String, accent: Color) {
+    Text(text = label, style = typography.labelMedium, color = colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(6.dp))
+    Text(
+        text = value.toString(),
+        style = typography.headlineMedium,
+        fontWeight = FontWeight.Bold,
+        color = accent,
+    )
+    Spacer(Modifier.height(2.dp))
+    Text(text = caption, style = typography.bodySmall, color = colorScheme.onSurfaceVariant)
 }

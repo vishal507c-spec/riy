@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.5.1 - 2026-11-25
+- Deeper UX polish for Inner Flame: the four metric tiles are now ONE grouped "Your numbers" card (four competing surfaces became one calm surface, and a duplicated caption line was removed), insights became a single swipeable chip row instead of five stacked rows, the trend chart gained a faint baseline plus "15 days ago → Today" labels, the legend moved next to the calendar where it is needed, and today's calendar cell gets a bright cyan ring so positioning in the month is instant.
+- The flame now feels alive: 🔥 breathes with a gentle pulse while the flame is burning, stays still when broken, and the card's colours animate smoothly between kept and broken states.
+- Redundant subtitle paragraph removed — the status line already carries that information.
+
 ## v3.5.0 - 2026-11-25
 - The tracker is now **INNER FLAME**: renamed across the screen header, check-in header, entry button and bottom navigation.
 - The flame status hero answers "when did I keep it and when did it break" directly: a burning flame shows the current run length and the exact date it was kept since; a broken flame shows the exact date it went out, with the last-break line always visible. Real record dates only — nothing invented.

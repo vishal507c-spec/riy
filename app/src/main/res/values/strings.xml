@@ -181,6 +181,9 @@
     <string name="tracker_stat_no_days">NON-MASTURBATION DAYS</string>
     <string name="tracker_stat_current_streak">CURRENT STREAK</string>
     <string name="tracker_stat_longest_streak">LONGEST STREAK</string>
+    <string name="tracker_numbers_title">YOUR NUMBERS</string>
+    <string name="tracker_trend_start">15 days ago</string>
+    <string name="tracker_trend_end">Today</string>
     <string name="tracker_unrecorded_note">%1$d day(s) in this period have no entry. They are not counted as either kind of day.</string>
 
     <string name="tracker_calendar_header">MONTHLY CALENDAR</string>
