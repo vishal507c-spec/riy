@@ -11,7 +11,7 @@
     <string name="action_protection_starting">Turning on…</string>
 
     <!-- Plain-language facts on the home page -->
-    <string name="shield_working_title">WHAT\'S WORKING</string>
+    <string name="shield_working_title">PROTECTION STATUS</string>
     <string name="shield_sites_label">Adult websites</string>
     <string name="shield_sites_blocked">Blocked</string>
     <string name="shield_sites_not_confirmed">Not confirmed</string>
@@ -43,11 +43,11 @@
     <string name="status_protected_title">You\'re Protected</string>
     <string name="status_protected_detail">Adult websites are blocked. Calls and Telegram still work.</string>
 
-    <string name="status_restricted_title">2-Hour Limit</string>
-    <string name="status_restricted_detail">You slipped, so apps are paused for 2 hours.\nCalls and Telegram stay open.</string>
+    <string name="status_restricted_title">Protection is on</string>
+    <string name="status_restricted_detail">Adult sites are blocked on this phone.</string>
 
-    <string name="status_hardened_title">Extra Protection</string>
-    <string name="status_hardened_detail">Protection is stronger after repeated slips.</string>
+    <string name="status_hardened_title">Protection is on</string>
+    <string name="status_hardened_detail">Adult sites are blocked on this phone.</string>
 
     <string name="status_recovery_title">Getting Protection Back</string>
     <string name="status_recovery_detail">RIY is putting your shield back in place.\nPlease wait.</string>

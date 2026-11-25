@@ -115,7 +115,6 @@ internal fun ProtectionScreen(
         state.shieldStatus != ShieldStatus.VERIFIED
     val actionEnabled = state.shieldStatus != ShieldStatus.INITIALIZING &&
         state.shieldStatus != ShieldStatus.UNKNOWN
-    var showDetails by rememberSaveable { mutableStateOf(false) }
 
     SciFiFrame(
         header = "RIY",
@@ -175,12 +174,6 @@ internal fun ProtectionScreen(
                     value = stringResource(websiteValueRes(state.shieldStatus)),
                     color = if (verified) SciFiColors.GoGreen else SciFiColors.SolarAmber,
                 )
-                Spacer(Modifier.height(10.dp))
-                FactRow(
-                    label = stringResource(R.string.shield_calls_label),
-                    value = stringResource(R.string.shield_calls_value),
-                    color = SciFiColors.GoGreen,
-                )
             }
 
             // The daily tracker entry, in the same plain language.
@@ -210,53 +203,6 @@ internal fun ProtectionScreen(
                         )
                     }
                     Text("›", fontSize = 26.sp, color = SciFiColors.NeonCyan)
-                }
-            }
-
-            // Everything technical is optional now, behind one calm toggle.
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showDetails = !showDetails },
-                shape = AppUI.CardRadius,
-                colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(
-                                if (showDetails) R.string.shield_details_hide
-                                else R.string.shield_details_show,
-                            ),
-                            style = typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = stringResource(R.string.shield_details_hint),
-                            style = typography.bodySmall,
-                            color = colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Text(
-                        text = if (showDetails) "−" else "+",
-                        style = typography.headlineSmall,
-                        color = SciFiColors.NeonCyan,
-                    )
-                }
-            }
-
-            AnimatedVisibility(
-                visible = showDetails,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    ProtectionDetailsCard(state)
-                    ShieldLayersSection(state)
-                    HowItWorksSection()
                 }
             }
 

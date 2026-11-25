@@ -37,7 +37,7 @@ fun RiyApp(openCheckInOnStart: Boolean = false) {
 
         val lockActive = state.isRestricted || state.isRecovering
 
-        var screen by rememberSaveable { mutableStateOf(AppScreen.MAIN) }
+        var screen by rememberSaveable { mutableStateOf(AppScreen.TRACKER) }
         LaunchedEffect(lockActive) {
             if (lockActive) screen = AppScreen.MAIN
         }
@@ -89,16 +89,16 @@ fun RiyApp(openCheckInOnStart: Boolean = false) {
                 if (screen != AppScreen.CHECK_IN) {
                     NavigationBar {
                         NavigationBarItem(
-                            selected = screen == AppScreen.MAIN,
-                            onClick = { screen = AppScreen.MAIN },
-                            icon = { Icon(Icons.Filled.Shield, contentDescription = null) },
-                            label = { Text("Shield") },
-                        )
-                        NavigationBarItem(
                             selected = screen == AppScreen.TRACKER,
                             onClick = { screen = AppScreen.TRACKER },
                             icon = { Icon(Icons.Filled.Timer, contentDescription = null) },
                             label = { Text("Inner Flame") },
+                        )
+                        NavigationBarItem(
+                            selected = screen == AppScreen.MAIN,
+                            onClick = { screen = AppScreen.MAIN },
+                            icon = { Icon(Icons.Filled.Shield, contentDescription = null) },
+                            label = { Text("Shield") },
                         )
                     }
                 }

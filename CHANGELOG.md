@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.8.0 - 2026-11-25
+- Reordered the bottom navigation so **Inner Flame** is the first tab and **Shield** is the second.
+- The app now opens on Inner Flame by default.
+- Removed Call/Telegram and 2-hour app-limit concepts from the Shield dashboard UI, along with the advanced details toggle.
+- Shield now focuses only on the clear protection status: adult sites are blocked or not blocked, with one action button when attention is needed.
+- Renamed the shield status card to "PROTECTION STATUS" and simplified its wording.
+
 ## v3.7.0 - 2026-11-25
 - Complete INNER FLAME simplification and functional upgrade per the audit spec.
 - Dashboard now has exactly: Daily Check-in, Monthly Overview, Activity Calendar, Recent History, Settings.
