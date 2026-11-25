@@ -101,6 +101,15 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".tracker.TrackerNotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.vishal.riy.tracker.RECORD_LEAK" />
+                <action android:name="com.vishal.riy.tracker.RECORD_NO_LEAK" />
+            </intent-filter>
+        </receiver>
+
         <!-- DNS-filtering VPN service. Only the system (which holds
              BIND_VPN_SERVICE) may bind it. The android.net.VpnService action
              enables the system "Always-On VPN" option. -->

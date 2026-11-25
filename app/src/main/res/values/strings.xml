@@ -196,8 +196,8 @@
     <string name="tracker_status_empty">No entries yet. Answer today to start.</string>
     <string name="tracker_status_summary">%1$d day(s) saved. Last entry: %2$s. Tracking since %3$s.</string>
 
-    <string name="tracker_stat_yes_days">DAYS SLIPPED</string>
-    <string name="tracker_stat_no_days">DAYS CLEAN</string>
+    <string name="tracker_stat_yes_days">LEAK DAYS</string>
+    <string name="tracker_stat_no_days">NO LEAK DAYS</string>
     <string name="tracker_stat_current_streak">CURRENT RUN</string>
     <string name="tracker_stat_longest_streak">BEST RUN</string>
     <string name="tracker_numbers_title">YOUR JOURNEY</string>
@@ -212,10 +212,27 @@
     <string name="tracker_back">Back</string>
     <string name="tracker_saved">Saved</string>
     <string name="tracker_legend">Green = stayed clean · Orange = slipped · Grey = no answer. A dot under a date means it has a note.</string>
-    <string name="tracker_legend_clean">Stayed clean</string>
-    <string name="tracker_legend_slipped">Slipped</string>
-    <string name="tracker_legend_not_sure">Not sure</string>
-    <string name="tracker_legend_no_answer">No answer</string>
+    <string name="tracker_legend_clean">No Leak</string>
+    <string name="tracker_legend_slipped">Leak</string>
+    <string name="tracker_legend_not_sure">Not Recorded</string>
+    <string name="tracker_legend_no_answer">Not Recorded</string>>
+
+    <!-- Monthly overview and history -->
+    <string name="tracker_monthly_overview_title">MONTHLY OVERVIEW</string>
+    <string name="tracker_monthly_no_leak">No Leak days</string>
+    <string name="tracker_monthly_leak">Leak days</string>
+    <string name="tracker_monthly_not_recorded">Not Recorded days</string>
+    <string name="tracker_monthly_total">Days recorded</string>
+    <string name="tracker_history_title">RECENT HISTORY</string>
+    <string name="tracker_history_empty">No records yet.</string>
+    <string name="tracker_history_delete">Delete</string>
+    <string name="tracker_history_delete_confirm">Delete this record?</string>
+    <string name="tracker_history_edit">Edit</string>
+
+    <!-- Privacy and data -->
+    <string name="tracker_privacy_title">PRIVACY</string>
+    <string name="tracker_privacy_body">Your tracker history is part of RIY\'s existing Google Drive backup. Nothing is shared unless you choose to export.</string>
+    <string name="tracker_export_csv">Export data</string>
 
     <!-- Tracker insights: honest counts only, never scores or health claims. -->
     <string name="tracker_insight_week_no">Clean days this week</string>
@@ -284,7 +301,6 @@
     <string name="tracker_minute">Minute</string>
     <string name="tracker_cancel">Cancel</string>
     <string name="tracker_confirm">Yes, do it</string>
-    <string name="tracker_export_csv">Share my history</string>
     <string name="tracker_export_hint">Opens the share menu as a CSV file. Nothing leaves your phone until you pick an app.</string>
     <string name="tracker_export_failed">Sharing is not available right now</string>
 
@@ -292,9 +308,9 @@
     <string name="tracker_question">How did that day go?</string>
     <string name="tracker_checkin_hint">Staying clean keeps your inner flame alive.</string>
     <string name="tracker_date_hint">Your answer will be saved for this date</string>
-    <string name="tracker_answer_yes">Slipped</string>
-    <string name="tracker_answer_no">Stayed clean</string>
-    <string name="tracker_answer_unknown">Not sure</string>
+    <string name="tracker_answer_yes">Leak</string>
+    <string name="tracker_answer_no">No Leak</string>
+    <string name="tracker_answer_unknown">Not Recorded</string>
     <string name="tracker_save_continue">Save</string>
     <string name="tracker_later">Not now</string>
     <string name="tracker_delete_record">Delete this answer</string>
@@ -302,8 +318,8 @@
     <!-- Privacy: the morning notification carries NO date, answer or streak. -->
     <string name="tracker_notification_channel">Daily check-in</string>
     <string name="tracker_notification_channel_desc">Reminds you that the daily entry is pending.</string>
-    <string name="tracker_notification_title">RIY Shield</string>
-    <string name="tracker_notification_text">RIY Shield — Daily check-in pending.</string>
+    <string name="tracker_notification_title">INNER FLAME</string>
+    <string name="tracker_notification_text">Yesterday\'s check-in</string>
 
     <string name="state_unverified">Running — not verified</string>
     <!-- Headline titles. Each of these replaces "You're Protected", which must

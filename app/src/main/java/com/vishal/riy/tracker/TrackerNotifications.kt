@@ -61,8 +61,28 @@ object TrackerNotifications {
             return
         }
         runCatching {
+            val leakIntent = Intent(context, TrackerNotificationActionReceiver::class.java).apply {
+                action = TrackerNotificationActionReceiver.ACTION_RECORD_LEAK
+                putExtra(TrackerNotificationActionReceiver.EXTRA_TARGET_DAY, pendingDay)
+            }
+            val noLeakIntent = Intent(context, TrackerNotificationActionReceiver::class.java).apply {
+                action = TrackerNotificationActionReceiver.ACTION_RECORD_NO_LEAK
+                putExtra(TrackerNotificationActionReceiver.EXTRA_TARGET_DAY, pendingDay)
+            }
+            val leakPending = PendingIntent.getBroadcast(
+                context,
+                (pendingDay xor 0x1L).toInt(),
+                leakIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val noLeakPending = PendingIntent.getBroadcast(
+                context,
+                (pendingDay xor 0x2L).toInt(),
+                noLeakIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
             val notification = NotificationCompat.Builder(context, TrackerReminder.NOTIFICATION_CHANNEL_ID)
-                // Deliberately generic: no date, no answer, nothing sensitive.
                 .setSmallIcon(R.drawable.ic_launcher)
                 .setContentTitle(context.getString(R.string.tracker_notification_title))
                 .setContentText(context.getString(R.string.tracker_notification_text))
@@ -70,6 +90,8 @@ object TrackerNotifications {
                     context.getString(R.string.tracker_notification_text),
                 ))
                 .setContentIntent(checkInIntent(context))
+                .addAction(R.drawable.ic_launcher, context.getString(R.string.tracker_answer_yes), leakPending)
+                .addAction(R.drawable.ic_launcher, context.getString(R.string.tracker_answer_no), noLeakPending)
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)

@@ -127,6 +127,12 @@ fun TrackerCheckInSheet(
                 selected = selected == TrackerStatus.UNKNOWN,
             ) { selected = TrackerStatus.UNKNOWN }
 
+            AnswerButton(
+                label = stringResource(R.string.tracker_answer_unknown),
+                accent = SciFiColors.Telemetry,
+                selected = selected == TrackerStatus.UNKNOWN,
+            ) { selected = TrackerStatus.UNKNOWN }
+
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },

@@ -76,8 +76,8 @@ data class TrackerStats(
  *
  * Rules, stated explicitly because they are the whole specification:
  *
- *  1. Masturbation days = number of distinct dates whose answer is YES.
- *  2. Non-masturbation days = number of distinct dates whose answer is NO.
+ *  1. Leak days = number of distinct dates whose answer is YES.
+ *  2. No Leak days = number of distinct dates whose answer is NO.
  *  3. An unrecorded day is NEVER counted as NO. It is counted separately in
  *     [TrackerStats.unrecordedDays] and it BREAKS a streak.
  *  4. UNKNOWN is a real answer that counts in [TrackerStats.unknownDays] but
@@ -86,7 +86,7 @@ data class TrackerStats(
  *     day. "Completed" means strictly before the current local day: today is
  *     still in progress, so it is excluded until it has an answer of its own.
  *     If yesterday has no confirmed NO the streak is 0 — an unanswered day
- *     never counts as a day without masturbation.
+ *     never counts as a day without a leak.
  *  6. [TrackerStats.longestStreak] is the longest run of dates where each date
  *     is confirmed NO and the next date is exactly one day later. A gap ends the
  *     run; it is not bridged.

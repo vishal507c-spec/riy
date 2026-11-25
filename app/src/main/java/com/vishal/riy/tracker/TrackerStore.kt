@@ -165,7 +165,7 @@ class TrackerStore(context: Context) {
         private const val KEY_STREAK_FREEZE = "tracker_streak_freeze"
         private const val KEY_STREAK_FREEZE_VALUE = "tracker_streak_freeze_value"
 
-        const val DEFAULT_REMINDER_HOUR = 9
+        const val DEFAULT_REMINDER_HOUR = 7
         const val DEFAULT_REMINDER_MINUTE = 0
     }
 }

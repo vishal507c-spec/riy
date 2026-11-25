@@ -1,5 +1,21 @@
 # Changelog
 
+## v3.7.0 - 2026-11-25
+- Complete INNER FLAME simplification and functional upgrade per the audit spec.
+- Dashboard now has exactly: Daily Check-in, Monthly Overview, Activity Calendar, Recent History, Settings.
+- Removed Flame History card, trend charts, repeated stats, insights, freeze toggle, bulk month marking, duplicate check-in controls and daily-note clutter from the main dashboard.
+- Daily check-in now asks one question with two prominent buttons: Leak and No Leak. Missing responses stay Not Recorded.
+- Monthly overview counts No Leak days, Leak days and Not Recorded days for the selected month.
+- Activity calendar disables future dates and keeps month navigation.
+- Recent history lists date, status, edit and delete, newest first.
+- Settings now contains the daily reminder, reminder time, privacy disclosure and data export.
+- Default reminder time changed to 07:00 for new or unset preferences.
+- Morning notification now shows INNER FLAME / Yesterday's check-in with YES and NO actions that save directly for yesterday, dismiss after success and never overwrite an existing answer.
+- A dedicated notification action receiver binds each action to its original target date.
+- All user-visible "masturbation" terminology removed; status words are now Leak / No Leak / Not Recorded.
+- Pure AMOLED black tracker background and simpler cards.
+- All unit tests, Android lint and debug compilation pass.
+
 ## v3.6.0 - 2026-11-25
 - Plain-language redesign of both main pages so anyone can understand them at a glance.
 - **Shield page**: one honest status card, one button only when attention is needed, a simple "What's working" list (adult websites + calls/Telegram) and the daily-tracker entry. Every technical check (phone protection, app limits, website blocking, system check, the six shield layers and the four-step pipeline) moved behind a single "See every check" toggle that is closed by default. Status wording rewritten in plain words ("Adult websites are blocked", "You slipped, so apps are paused for 2 hours", "Protection needs a check", etc.).

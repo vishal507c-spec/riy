@@ -25,6 +25,8 @@ data class TrackerCalendarDay(
 /** Everything the tracker screen renders. Derived, never invented. */
 data class TrackerUiState(
     val stats: TrackerStats = TrackerStats.EMPTY,
+    /** The local calendar day "today", used to disable future dates. */
+    val todayEpochDay: Long = 0L,
     /** Currently displayed month, as an epoch day inside that month. */
     val monthAnchor: Long = 0L,
     val days: List<TrackerCalendarDay> = emptyList(),
@@ -35,10 +37,10 @@ data class TrackerUiState(
     val showCheckIn: Boolean = false,
     val checkInDate: Long? = null,
     val savedConfirmation: String? = null,
-    /** Last 14 completed days (index 0 = 13 days ago, last = yesterday). */
-    val recentStatuses: List<TrackerStatus?> = emptyList(),
     /** Today's answer, or null while today is still unanswered. */
     val todayStatus: TrackerStatus? = null,
+    /** All saved records, newest first, for the history list. */
+    val history: List<TrackerDay> = emptyList(),
 ) {
     val isEmpty: Boolean get() = stats.recordedDays == 0 && stats.trackingStartDay == null
 }
@@ -90,6 +92,7 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
 
         _state.value = TrackerUiState(
             stats = stats,
+            todayEpochDay = today,
             monthAnchor = monthStart,
             days = (0 until monthLength).map { offset ->
                 val day = monthStart + offset
@@ -105,8 +108,8 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
             showCheckIn = showCheckIn,
             checkInDate = checkInDate,
             savedConfirmation = confirmation,
-            recentStatuses = (13 downTo 1).map { offset -> byDay[today - offset]?.status },
             todayStatus = byDay[today]?.status,
+            history = records.sortedByDescending { it.epochDay },
         )
     }
 

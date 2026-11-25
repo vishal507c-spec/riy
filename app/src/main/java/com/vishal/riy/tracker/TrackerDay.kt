@@ -10,7 +10,7 @@ package com.vishal.riy.tracker
  * separately and is used only for auditing, never for identity.
  */
 enum class TrackerStatus {
-    /** Masturbation occurred on this date. */
+    /** Leak occurred on this date. */
     YES,
 
     /** Confirmed: did not occur on this date. */
