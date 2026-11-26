@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.11.0 - 2026-11-26
+- Root-caused "Running — Not Verified" / "Not confirmed": the end-to-end self-test ran only once at startup, the filter loop could die while leaving a stale `running` flag and CONNECTED phase, and the "Fix protection" button called a plain start that is a no-op while that flag is set.
+- Added a real fix path: `Fix protection` now tears down and re-establishes the tunnel, then performs a genuine self-test. Repeated taps are serialized and ignored while a check is in flight.
+- Added bounded verification retries (2s/4s/8s, max 3), a 5-minute periodic re-verification, and re-verification on Wi-Fi/mobile network changes, foreground resume, and the existing watchdog.
+- A filter-loop death is now reported honestly and recovered through the watchdog instead of leaving a dead filter looking connected.
+- Simplified Shield to four truthful states — PROTECTED / CHECKING / NOT VERIFIED / NOT PROTECTED — with the last successful verification time and the exact failure reason. The foreground notification no longer claims "ON" while unverified.
+- Fixed the duplicate "Not Recorded" button in the daily check-in sheet.
+- Moved the UI backend refresh off the main thread and reduced its cadence.
+- Inner Flame records, storage format, naming and backup compatibility are unchanged.
+
 ## v3.10.0 - 2026-11-26
 - Fresh start: all previous tracker history, streak state, reminders and prompt flags are wiped automatically on the first launch of this version. Tracking begins from today, and the automatic "yesterday" check-in is suppressed so no old date is asked about. The wipe runs only once.
 - Added a manual "Clear all data & start today" action in Settings, behind a confirmation dialog, for a fresh start at any time.

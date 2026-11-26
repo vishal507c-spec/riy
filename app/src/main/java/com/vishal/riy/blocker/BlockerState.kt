@@ -106,12 +106,28 @@ object BlockerState {
          * a managed device.
          */
         val privateDnsRestricted: Boolean = false,
+        /**
+         * Epoch millis of the LAST self-test that actually passed. Kept even
+         * when protection later becomes unverified, so the dashboard can say
+         * "last verified at …" honestly. Null means it was never verified —
+         * the UI must never invent a time.
+         */
+        val lastVerifiedAt: Long? = null,
     )
 
     private val snapshot = AtomicReference(Snapshot())
 
     /** Current real state; always derived from the service, never the UI. */
     fun current(): Snapshot = snapshot.get()
+
+    /**
+     * Restores only the historical "last verified" timestamp after a process
+     * restart. This is a past fact, never a current protection claim.
+     */
+    fun restoreVerifiedAt(timestamp: Long?) {
+        if (timestamp == null || timestamp <= 0L) return
+        snapshot.set(snapshot.get().copy(lastVerifiedAt = timestamp))
+    }
 
     fun update(
         phase: Phase,
@@ -122,6 +138,9 @@ object BlockerState {
         selfTestSummary: String? = null,
         privateDnsConfigured: Boolean = false,
         privateDnsRestricted: Boolean = false,
+        /** Null preserves the previous value: a failed test must NOT erase the
+         * fact that an earlier test passed. */
+        lastVerifiedAt: Long? = null,
     ) {
         snapshot.set(
             Snapshot(
@@ -133,6 +152,7 @@ object BlockerState {
                 selfTestSummary = selfTestSummary,
                 privateDnsConfigured = privateDnsConfigured,
                 privateDnsRestricted = privateDnsRestricted,
+                lastVerifiedAt = lastVerifiedAt ?: snapshot.get().lastVerifiedAt,
             ),
         )
     }

@@ -109,7 +109,10 @@ class ProtectionWatchdogReceiver : BroadcastReceiver() {
         com.vishal.riy.admin.AlwaysOnVpn.apply(context)
 
         try {
-            BlockerVpnService.start(context, allowRetry = true)
+            // Re-VERIFY, not just "start": a running filter with a stale
+            // unverified result used to stay that way forever because start()
+            // is a no-op while the tun is up.
+            BlockerVpnService.verify(context)
         } catch (e: Exception) {
             // Background-start restrictions or a boot race: the alarm armed
             // above will try again, so this is never fatal.

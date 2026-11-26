@@ -307,15 +307,23 @@ class MainActivity : AppCompatActivity() {
         com.vishal.riy.blocker.ProtectionWatchdog.schedule(this)
 
         val phase = BlockerState.current().phase
-        if (phase != BlockerState.Phase.CONNECTED &&
-            phase != BlockerState.Phase.CONNECTING
-        ) {
-            Log.i("BlockerApp", "protection wanted but $phase — restarting service")
-            try {
-                BlockerVpnService.start(this)
-            } catch (e: Exception) {
-                Log.e("BlockerApp", "failed to restart protection", e)
+        try {
+            when (phase) {
+                BlockerState.Phase.CONNECTED -> {
+                    // A tunnel may be up while verification is stale/unverified.
+                    // Re-verify on foreground without interrupting it.
+                    BlockerVpnService.verify(this)
+                }
+                BlockerState.Phase.CONNECTING -> {
+                    // Establishment already in flight; leave it alone.
+                }
+                else -> {
+                    Log.i("BlockerApp", "protection wanted but $phase — restarting service")
+                    BlockerVpnService.start(this)
+                }
             }
+        } catch (e: Exception) {
+            Log.e("BlockerApp", "failed to restore protection", e)
         }
     }
 

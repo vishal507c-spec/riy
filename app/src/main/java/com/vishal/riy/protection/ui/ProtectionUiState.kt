@@ -70,6 +70,15 @@ data class ProtectionUiState(
     /** True when an encrypted-DNS route may still bypass the filter. */
     val encryptedDnsBypassPossible: Boolean = true,
 
+    /** Epoch millis of the last PASSING verification, or null if never verified. */
+    val lastVerifiedAt: Long? = null,
+
+    /**
+     * The exact, understandable reason protection cannot be confirmed (or null
+     * when it can). Shown under the status so a failure is never silent.
+     */
+    val shieldDetail: String? = null,
+
 ) {
 
     /**

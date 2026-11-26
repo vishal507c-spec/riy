@@ -10,6 +10,16 @@
     <string name="action_allow_protection">Allow protection</string>
     <string name="action_protection_starting">Turning on…</string>
 
+    <!-- The ONLY four Shield states. No invented "fully protected" wording. -->
+    <string name="shield_state_protected">PROTECTED</string>
+    <string name="shield_state_checking">CHECKING</string>
+    <string name="shield_state_not_verified">NOT VERIFIED</string>
+    <string name="shield_state_not_protected">NOT PROTECTED</string>
+    <string name="shield_detail_protected">Adult websites are blocked. This was verified end to end.</string>
+    <string name="shield_detail_not_verified">The filter is running, but blocking could not be confirmed right now.</string>
+    <string name="shield_detail_not_protected">Protection is off or not available. Nothing is being blocked.</string>
+    <string name="shield_last_verified">Last verified: %1$s</string>
+
     <!-- Plain-language facts on the home page -->
     <string name="shield_working_title">PROTECTION STATUS</string>
     <string name="shield_sites_label">Adult websites</string>
@@ -29,6 +39,9 @@
     <string name="blocker_notification_channel">Protection status</string>
     <string name="blocker_notification_title">Protection is ON</string>
     <string name="blocker_notification_text">Adult websites are being blocked</string>
+    <!-- Never claim "ON" while verification is still pending or has failed. -->
+    <string name="blocker_notification_checking_title">Checking protection</string>
+    <string name="blocker_notification_checking_text">RIY is verifying the filter. Protection is not confirmed yet.</string>
 
     <!--
         ZERO-CONFUSION UI (Phase 10).

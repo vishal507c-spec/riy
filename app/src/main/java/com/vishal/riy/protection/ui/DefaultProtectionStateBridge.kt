@@ -148,6 +148,7 @@ class DefaultProtectionStateBridge(
 
         val status = enforcementStatus()
         val integrityStatus = integrityStatus()
+        val filterSnapshot = BlockerState.current()
 
         return ProtectionUiState(
             protectionState = protectionState,
@@ -164,7 +165,9 @@ class DefaultProtectionStateBridge(
             recentEvents = eventStore.recent(),
             restrictedReason = session?.takeIf { it.state.isRestrictedSession() }?.reason,
             shieldStatus = shieldStatus(),
-            encryptedDnsBypassPossible = encryptedDnsBypassPossible(BlockerState.current()),
+            encryptedDnsBypassPossible = encryptedDnsBypassPossible(filterSnapshot),
+            lastVerifiedAt = filterSnapshot.lastVerifiedAt,
+            shieldDetail = filterSnapshot.failureReason ?: filterSnapshot.selfTestSummary,
         )
     }
 

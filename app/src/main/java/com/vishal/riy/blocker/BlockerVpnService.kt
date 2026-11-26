@@ -3,6 +3,8 @@ package com.vishal.riy.blocker
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
@@ -65,6 +67,33 @@ class BlockerVpnService : VpnService() {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var retryAttempt = 0
 
+    /** Serializes start/stop/recheck so two intents can never tear down a tun
+     * that another one is still establishing. */
+    private val operationLock = Any()
+
+    /** One verification at a time. A second "Fix protection" tap is ignored
+     * (the UI already shows CHECKING), never allowed to start a second filter. */
+    private val verificationInProgress = AtomicBoolean(false)
+
+    /** Rule count of the running filter, used when re-verifying without a
+     * full restart. */
+    private var loadedRuleCount = 0
+
+    private var pendingVerification: Runnable? = null
+    private var pendingNetworkReverify: Runnable? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+    /** Re-verifies periodically: a one-time self-test could otherwise stay
+     * "Not verified" forever after a transient DNS failure. */
+    private val periodicVerificationRunnable = object : Runnable {
+        override fun run() {
+            if (isWanted() && running.get() && !verificationInProgress.get()) {
+                verifyOnly()
+            }
+            mainHandler.postDelayed(this, VERIFY_INTERVAL_MS)
+        }
+    }
+
     /**
      * THE Phase 10 intelligence front-end. It wraps the production
      * [com.vishal.riy.protection.ProtectionEventProcessor] graph and adds the
@@ -113,6 +142,9 @@ class BlockerVpnService : VpnService() {
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "service created")
+        BlockerState.restoreVerifiedAt(BlockerStateStore(this).lastVerifiedAt.takeIf { it > 0L })
+        registerNetworkChanges()
+        mainHandler.postDelayed(periodicVerificationRunnable, VERIFY_INTERVAL_MS)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -144,6 +176,20 @@ class BlockerVpnService : VpnService() {
                 com.vishal.riy.admin.AlwaysOnVpn.apply(this)
                 ProtectionWatchdog.schedule(this)
                 startFiltering(allowRetry = intent.getBooleanExtra(EXTRA_ALLOW_RETRY, false))
+                android.app.Service.START_STICKY
+            }
+            ACTION_RECHECK -> {
+                // User pressed "Fix protection": tear down and re-establish the
+                // tunnel, then run a REAL end-to-end self-test. A plain start is
+                // a no-op while the stale "running" flag is set — which is why
+                // the button used to do nothing.
+                if (isWanted()) restartForVerification() else startFiltering(allowRetry = false)
+                android.app.Service.START_STICKY
+            }
+            ACTION_VERIFY -> {
+                // Health re-check from the watchdog / network change / periodic
+                // timer. No tunnel interruption when the filter is already up.
+                if (isWanted()) verifyOnly()
                 android.app.Service.START_STICKY
             }
             else -> {
@@ -222,12 +268,17 @@ class BlockerVpnService : VpnService() {
         running.set(false)
         runCatching { vpnInterface?.close() }
         vpnInterface = null
+        cancelPendingVerification()
+        mainHandler.removeCallbacks(periodicVerificationRunnable)
+        unregisterNetworkChanges()
+        verificationInProgress.set(false)
         Log.i(TAG, "service destroyed")
         super.onDestroy()
     }
 
     // ---------------------------------------------------------------- state
 
+    @Synchronized
     private fun startFiltering(allowRetry: Boolean = false) {
         if (running.get() && vpnInterface != null) {
             // Already live: keep the evidence we already have. Re-announcing
@@ -247,6 +298,8 @@ class BlockerVpnService : VpnService() {
         // Fresh (user-initiated) starts reset the retry counter; retries must
         // keep counting up or they would loop forever.
         if (!allowRetry) retryAttempt = 0
+        cancelPendingVerification()
+        verificationInProgress.set(true)
         BlockerState.update(BlockerState.Phase.CONNECTING)
 
         val fd = try {
@@ -300,6 +353,7 @@ class BlockerVpnService : VpnService() {
             }
             if (!running.get()) return@thread // stopped while we were loading
             Log.i(TAG, "protection active (${blocklist.ruleCount} blocklist rules, SafeSearch enforced)")
+            loadedRuleCount = blocklist.ruleCount
             BlockerState.update(BlockerState.Phase.CONNECTED, ruleCount = blocklist.ruleCount)
             // Prime the SafeSearch VIP cache and verify ourselves in the
             // background: the filter is live but NOT yet proven, and the UI must
@@ -312,22 +366,118 @@ class BlockerVpnService : VpnService() {
     }
 
     /**
-     * Records what the filter has actually proven so far, never more than that.
-     * Kept in one place so no code path can publish a reassuring state.
+     * Runs the end-to-end self-test and publishes ONLY what it measured.
+     * A transient failure is retried with bounded exponential backoff instead
+     * of leaving the shield unverified forever. The guard is released only
+     * after the last attempt (or when the filter stops), so repeated "Fix
+     protection" taps can never start a second concurrent recovery.
      */
-    /**
-     * Runs the end-to-end self-test and publishes ONLY what it measured. A
-     * self-test that cannot reach the filter downgrades the state rather than
-     * leaving a stale "verified" claim on screen.
-     */
-    private fun runSelfTest(ruleCount: Int) {
+    private fun runSelfTest(ruleCount: Int, attempt: Int = 0) {
+        loadedRuleCount = ruleCount
         scope.launch {
             val report = withContext(Dispatchers.IO) {
                 FilterSelfTest(VPN_DNS_ADDRESS).run(ruleCount)
             }
-            if (!running.get()) return@launch
+            if (!running.get() || !isWanted()) {
+                verificationInProgress.set(false)
+                return@launch
+            }
             publishFilterState(ruleCount, report)
+            if (!report.verified && VerificationBackoff.shouldRetry(attempt)) {
+                val runnable = Runnable { runSelfTest(ruleCount, attempt + 1) }
+                pendingVerification = runnable
+                mainHandler.postDelayed(runnable, VerificationBackoff.delayMs(attempt))
+            } else {
+                cancelPendingVerification()
+                verificationInProgress.set(false)
+                if (!report.verified) Log.w(TAG, "verification did not pass: ${report.summary()}")
+            }
         }
+    }
+
+    /** Re-checks a running filter WITHOUT interrupting the tunnel. */
+    @Synchronized
+    private fun verifyOnly() {
+        if (!isWanted() || verificationInProgress.get()) return
+        if (!running.get() || vpnInterface == null) {
+            startFiltering(allowRetry = true)
+            return
+        }
+        verificationInProgress.set(true)
+        runSelfTest(loadedRuleCount)
+    }
+
+    /**
+     * The real "Fix protection" path: tear down the stale tunnel, establish a
+     * fresh one and verify it end to end. Serialized with every other lifecycle
+     * operation so two taps can never race each other.
+     */
+    @Synchronized
+    private fun restartForVerification() {
+        if (verificationInProgress.get()) {
+            Log.i(TAG, "verification already in progress; ignoring duplicate fix request")
+            return
+        }
+        verificationInProgress.set(true)
+        cancelPendingVerification()
+        cancelPendingNetworkReverify()
+        mainHandler.removeCallbacks(retryRunnable)
+        running.set(false)
+        runCatching { vpnInterface?.close() }
+        vpnInterface = null
+        worker?.let { runCatching { it.join(500) } }
+        worker = null
+        runCatching { scope.cancel() }
+        scope = newScope()
+        BlockerState.update(
+            BlockerState.Phase.CONNECTING,
+            failureReason = "Checking protection…",
+        )
+        startFiltering(allowRetry = true)
+    }
+
+    private fun cancelPendingVerification() {
+        pendingVerification?.let { runCatching { mainHandler.removeCallbacks(it) } }
+        pendingVerification = null
+    }
+
+    private fun cancelPendingNetworkReverify() {
+        pendingNetworkReverify?.let { runCatching { mainHandler.removeCallbacks(it) } }
+        pendingNetworkReverify = null
+    }
+
+    private fun isWanted(): Boolean = BlockerStateStore(this).isProtectionWanted()
+
+    private fun registerNetworkChanges() {
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) = scheduleNetworkReverify()
+            override fun onLost(network: Network) = scheduleNetworkReverify()
+        }
+        runCatching {
+            manager.registerDefaultNetworkCallback(callback)
+            networkCallback = callback
+        }.onFailure { Log.w(TAG, "network callback unavailable: ${it.message}") }
+    }
+
+    private fun unregisterNetworkChanges() {
+        networkCallback?.let { callback ->
+            runCatching { getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(callback) }
+        }
+        networkCallback = null
+    }
+
+    /**
+     * Wi-Fi <-> mobile changes alter the upstream DNS path. Let the stack settle,
+     * then re-verify rather than trusting an old result. A burst of changes is
+     * collapsed into a single check.
+     */
+    private fun scheduleNetworkReverify() {
+        if (!isWanted() || !running.get()) return
+        cancelPendingNetworkReverify()
+        val runnable = Runnable { verifyOnly() }
+        pendingNetworkReverify = runnable
+        mainHandler.postDelayed(runnable, NETWORK_SETTLE_MS)
     }
 
     /**
@@ -335,23 +485,31 @@ class BlockerVpnService : VpnService() {
      * Single publish point so no code path can show a reassuring state.
      */
     private fun publishFilterState(ruleCount: Int, report: SelfTestReport? = null) {
-        val phase = BlockerState.current().phase
+        val snapshot = BlockerState.current()
+        val phase = snapshot.phase
         val health = report?.health() ?: BlockerState.healthFor(phase)
         val privateDnsConfigured = EncryptedDnsInspector.isPrivateDnsConfigured(this)
         val privateDnsRestricted = isPrivateDnsRestricted()
+        val verifiedAt = if (report?.verified == true) System.currentTimeMillis() else null
+        if (verifiedAt != null) BlockerStateStore(this).lastVerifiedAt = verifiedAt
         BlockerState.update(
             phase = phase,
+            failureReason = report?.takeIf { !it.verified }?.summary(),
             health = health,
             ruleCount = ruleCount,
             selfTestSummary = report?.summary(),
             privateDnsConfigured = privateDnsConfigured,
             privateDnsRestricted = privateDnsRestricted,
+            // A failed test must never erase the time of the last passing one.
+            lastVerifiedAt = verifiedAt,
         )
         val exposure = EncryptedDnsExposure(privateDnsConfigured, privateDnsRestricted, report?.verified == true)
         Log.i(
             TAG,
             "filter state: rules=$ruleCount health=$health bypassPossible=${exposure.bypassPossible}",
         )
+        // The foreground notification reports the same evidence as the dashboard.
+        mainHandler.post { startForegroundInternal() }
     }
 
     /**
@@ -369,10 +527,14 @@ class BlockerVpnService : VpnService() {
     /** Reads back whether the private-DNS restriction is genuinely in force. */
     private fun isPrivateDnsRestricted(): Boolean = EncryptedDnsPolicy.isRestricted(this)
 
+    @Synchronized
     private fun stopFiltering() {
         if (running.getAndSet(false)) {
             Log.i(TAG, "stopping protection")
         }
+        cancelPendingVerification()
+        cancelPendingNetworkReverify()
+        verificationInProgress.set(false)
         mainHandler.removeCallbacks(retryRunnable)
         runCatching { vpnInterface?.close() }
         vpnInterface = null
@@ -385,10 +547,14 @@ class BlockerVpnService : VpnService() {
         stopSelf()
     }
 
+    @Synchronized
     private fun fail(
         reason: String,
         kind: BlockerState.FailureKind = BlockerState.FailureKind.VPN_DISCONNECTED,
     ) {
+        cancelPendingVerification()
+        cancelPendingNetworkReverify()
+        verificationInProgress.set(false)
         mainHandler.removeCallbacks(retryRunnable)
         // Tear the tun down BEFORE reporting FAILED: leaving it open with no
         // filter loop silently blackholes DNS and makes a later start a no-op.
@@ -479,6 +645,23 @@ class BlockerVpnService : VpnService() {
             }
         }
         Log.i(TAG, "filter loop exited")
+        // Exiting while we STILL own the tun is not a normal stop: the filter
+        // thread died. The old code left `running=true` and a stale CONNECTED
+        // phase, so every later start was a no-op and the shield lied about a
+        // dead filter. Report it honestly and let the watchdog recover.
+        if (running.get() && vpnInterface == fd) onFilterLoopDied()
+    }
+
+    private fun onFilterLoopDied() {
+        mainHandler.post {
+            if (!running.get() || !isWanted()) return@post
+            Log.w(TAG, "filter loop died unexpectedly; recovering")
+            fail(
+                "The filter stopped unexpectedly; protection is being restored",
+                BlockerState.FailureKind.VPN_DISCONNECTED,
+            )
+            ProtectionWatchdog.scheduleSoon(this)
+        }
     }
 
     private fun processPacket(
@@ -678,8 +861,8 @@ class BlockerVpnService : VpnService() {
         }
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher)
-            .setContentTitle(getString(R.string.blocker_notification_title))
-            .setContentText(getString(R.string.blocker_notification_text))
+            .setContentTitle(getString(notificationTitleRes()))
+            .setContentText(getString(notificationTextRes()))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -700,10 +883,33 @@ class BlockerVpnService : VpnService() {
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
     }
 
+    /** The notification must never claim "ON" for an unverified filter. */
+    private fun notificationTitleRes(): Int = if (isVerifiedNow()) {
+        R.string.blocker_notification_title
+    } else {
+        R.string.blocker_notification_checking_title
+    }
+
+    private fun notificationTextRes(): Int = if (isVerifiedNow()) {
+        R.string.blocker_notification_text
+    } else {
+        R.string.blocker_notification_checking_text
+    }
+
+    private fun isVerifiedNow(): Boolean {
+        val snapshot = BlockerState.current()
+        return snapshot.phase == BlockerState.Phase.CONNECTED &&
+            snapshot.health == BlockerState.FilterHealth.VERIFIED
+    }
+
     companion object {
         private const val TAG = "BlockerVpn"
         const val ACTION_START = "com.vishal.riy.blocker.ACTION_START"
         const val ACTION_STOP = "com.vishal.riy.blocker.ACTION_STOP"
+        /** Full tear-down + re-establish + real self-test (user "Fix protection"). */
+        const val ACTION_RECHECK = "com.vishal.riy.blocker.ACTION_RECHECK"
+        /** Self-test only when the filter is up; no tunnel interruption. */
+        const val ACTION_VERIFY = "com.vishal.riy.blocker.ACTION_VERIFY"
 
         private const val CHANNEL_ID = "blocker_protection"
         private const val NOTIFICATION_ID = 1001
@@ -720,6 +926,10 @@ class BlockerVpnService : VpnService() {
         private const val EXTRA_ALLOW_RETRY = "allow_retry"
         private const val MAX_BOOT_RETRIES = 12
         private const val RETRY_DELAY_MS = 10_000L
+        /** Periodic honesty check: a stale "verified" result must not live forever. */
+        private const val VERIFY_INTERVAL_MS = 5 * 60 * 1000L
+        /** Let the network settle before re-verifying after Wi-Fi/cellular switches. */
+        private const val NETWORK_SETTLE_MS = 2_000L
 
         /** Real upstream resolvers used for allowed queries. */
         // IPv4 and IPv6 literals: on IPv6-only/NAT64-less networks an IPv4-only
@@ -799,6 +1009,33 @@ class BlockerVpnService : VpnService() {
                 context.startForegroundService(intent)
             } else {
                 context.startService(intent)
+            }
+        }
+
+        /**
+         * Asks the service to REALLY fix protection: re-establish the tunnel and
+         * re-run verification. Unlike [start] this is never a no-op when the
+         * "running" flag is stale.
+         */
+        fun recheck(context: Context): Boolean = deliver(context, ACTION_RECHECK)
+
+        /** Cheap health re-check; does not interrupt a working tunnel. */
+        fun verify(context: Context): Boolean = deliver(context, ACTION_VERIFY)
+
+        /** Returns false when the ROM refused the start — the caller must show
+         * that honestly instead of leaving a button looking dead. */
+        private fun deliver(context: Context, action: String): Boolean {
+            val intent = Intent(context, BlockerVpnService::class.java).setAction(action)
+            return runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                true
+            }.getOrElse {
+                Log.w(TAG, "could not deliver $action: ${it.message}")
+                false
             }
         }
 
