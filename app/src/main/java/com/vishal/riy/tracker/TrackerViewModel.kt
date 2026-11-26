@@ -59,6 +59,14 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<TrackerUiState> = _state.asStateFlow()
 
+    init {
+        // One-time: wipe all old tracker data and begin again from today.
+        // Runs before any UI observes the state, so no stale history is ever
+        // rendered. Guarded by a marker, so this happens only once.
+        store.ensureFreshStart()
+        refresh()
+    }
+
     /** Undo window state for the short-lived "undo last save" action. */
     private var undoPending: Pair<Long, TrackerDay?>? = null
     private var undoExpiresAt = 0L
@@ -268,6 +276,28 @@ class TrackerViewModel(app: Application) : AndroidViewModel(app) {
         }
         return deleted
     }
+
+    /**
+     * FULL RESET — wipes every tracker record and setting, then rebuilds the
+     * state from scratch so tracking begins with TODAY as a blank slate.
+     *
+     * This is the "start fresh" action: it drops the undo window, the saved
+     * banner and the old month anchor, so no stale UI survives the wipe and
+     * the calendar lands on the current month immediately.
+     */
+    fun resetAll(): Boolean = runCatching {
+        store.clearAll()
+        undoPending = null
+        undoExpiresAt = 0L
+        _state.value = _state.value.copy(
+            monthAnchor = 0L,
+            editingDate = null,
+            showCheckIn = false,
+            checkInDate = null,
+            savedConfirmation = null,
+        )
+        refresh()
+    }.isSuccess
 
     /**
      * Reminder settings, mirrored for the tracker screen. Re-arms the

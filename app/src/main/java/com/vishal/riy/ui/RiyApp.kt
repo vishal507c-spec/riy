@@ -147,6 +147,7 @@ fun RiyApp(openCheckInOnStart: Boolean = false) {
                         onUndo = { trackerViewModel.undoLast() },
                         onDeleteRecord = { trackerViewModel.delete(it) },
                         onExportCsv = { trackerViewModel.exportCsv() },
+                        onResetAll = { trackerViewModel.resetAll() },
                         onConfirmationShown = trackerViewModel::clearConfirmation,
                     )
 

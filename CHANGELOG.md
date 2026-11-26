@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.10.0 - 2026-11-26
+- Fresh start: all previous tracker history, streak state, reminders and prompt flags are wiped automatically on the first launch of this version. Tracking begins from today, and the automatic "yesterday" check-in is suppressed so no old date is asked about. The wipe runs only once.
+- Added a manual "Clear all data & start today" action in Settings, behind a confirmation dialog, for a fresh start at any time.
+- Added an Inner Flame hero card showing the current run, best run, clean days and leak days from real saved records.
+- Fixed a stray character in the tracker legend string resource.
+
 ## v3.9.0 - 2026-11-25
 - Improved tracker clarity: the daily check-in now states exactly what is tracked ("did you have a leak today?") and explains Leak / No Leak / Not Recorded.
 - Removed the reminder controls from the tracker UI and settings card.

@@ -2,6 +2,7 @@ package com.vishal.riy.tracker
 
 import android.content.Context
 import com.vishal.riy.drive.DriveSync
+import java.util.TimeZone
 
 /**
  * On-device store for the daily tracker.
@@ -109,6 +110,47 @@ class TrackerStore(context: Context) {
         DriveSync.requestBackup()
     }
 
+    /**
+     * FULL RESET — starts the tracker completely fresh.
+     *
+     * Unlike [clear] (which only drops the day records), this removes EVERY
+     * tracker key: the history, the "already prompted today" flag, the streak
+     * freeze and its value, and the reminder settings. The next launch behaves
+     * exactly like a brand-new install: no old streak, no stale prompt that
+     * would suppress today's check-in, and no leftover configuration.
+     *
+     * Explicit user action only. The coalesced Drive backup is requested so the
+     * freshly-empty state replaces the old snapshot instead of resurrecting it
+     * on restore.
+     */
+    fun clearAll() {
+        val today = TrackerDates.today(System.currentTimeMillis(), TimeZone.getDefault())
+        prefs.edit()
+            .clear()
+            // Keep the one-time fresh-start marker so a manual reset never
+            // re-triggers the automatic wipe on the next launch.
+            .putBoolean(KEY_FRESH_START_DONE, true)
+            // Suppress the automatic "how was YESTERDAY?" prompt: after a reset
+            // there is no yesterday in this tracker. Tracking begins today.
+            .putLong(KEY_LAST_PROMPT_DAY, today)
+            .apply()
+        DriveSync.requestBackup()
+    }
+
+    /**
+     * One-time automatic wipe for the "start fresh from today" request.
+     *
+     * Runs at most once in the lifetime of the install: the marker survives the
+     * wipe itself, so reopening the app never clears a second time. After the
+     * wipe, today's automatic check-in prompt is suppressed so the tracker does
+     * not ask about a yesterday that no longer belongs to this fresh history —
+     * the user answers TODAY from the Today card instead.
+     */
+    fun ensureFreshStart() {
+        if (prefs.getBoolean(KEY_FRESH_START_DONE, false)) return
+        clearAll()
+    }
+
     // ------------------------------------------------------------- reminders
 
     /** True once the user has been shown the automatic prompt on [epochDay]. */
@@ -158,6 +200,7 @@ class TrackerStore(context: Context) {
         const val PREFS_NAME = "riy_tracker_prefs"
 
         const val KEY_DAYS = "tracker_days_v1"
+        private const val KEY_FRESH_START_DONE = "tracker_fresh_start_done_v1"
         private const val KEY_LAST_PROMPT_DAY = "tracker_last_prompt_day"
         private const val KEY_REMINDER_ENABLED = "tracker_reminder_enabled"
         private const val KEY_REMINDER_HOUR = "tracker_reminder_hour"

@@ -215,7 +215,7 @@
     <string name="tracker_legend_clean">No Leak</string>
     <string name="tracker_legend_slipped">Leak</string>
     <string name="tracker_legend_not_sure">Not Recorded</string>
-    <string name="tracker_legend_no_answer">Not Recorded</string>>
+    <string name="tracker_legend_no_answer">Not Recorded</string>
 
     <!-- Monthly overview and history -->
     <string name="tracker_monthly_overview_title">MONTHLY OVERVIEW</string>
@@ -303,6 +303,13 @@
     <string name="tracker_confirm">Yes, do it</string>
     <string name="tracker_export_hint">Opens the share menu as a CSV file. Nothing leaves your phone until you pick an app.</string>
     <string name="tracker_export_failed">Sharing is not available right now</string>
+
+    <!-- Fresh start: wipe every record and setting, then track again from today. -->
+    <string name="tracker_reset_title">Start fresh from today</string>
+    <string name="tracker_reset_body">Clear all saved days, your streak and settings, then begin tracking again from today. This cannot be undone.</string>
+    <string name="tracker_reset_button">Clear all data &amp; start today</string>
+    <string name="tracker_reset_confirm_body">Delete every saved day and setting? A fresh tracker starts from today. This cannot be undone.</string>
+    <string name="tracker_reset_confirm">Delete everything</string>
 
     <string name="tracker_greeting">Daily check-in</string>
     <string name="tracker_question">How did that day go?</string>

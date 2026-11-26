@@ -73,6 +73,7 @@ fun TrackerScreen(
     onUndo: () -> Unit,
     onDeleteRecord: (Long) -> Unit,
     onExportCsv: () -> Unit,
+    onResetAll: () -> Unit,
     onConfirmationShown: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -111,6 +112,8 @@ fun TrackerScreen(
                 SavedBanner(onUndo = onUndo)
             }
 
+            FlameHeroCard(state = state)
+
             DailyCheckInCard(
                 today = state.todayEpochDay,
                 todayStatus = state.todayStatus,
@@ -134,6 +137,7 @@ fun TrackerScreen(
 
             SettingsCard(
                 onExportCsv = onExportCsv,
+                onResetAll = onResetAll,
             )
         }
     }
@@ -161,6 +165,105 @@ private fun SavedBanner(onUndo: () -> Unit) {
                 )
             }
         }
+    }
+}
+
+/**
+ * The motivating hero: the current Inner Flame and the honest numbers behind
+ * it. Every value comes from [TrackerUiState.stats], which is derived only from
+ * real saved days — nothing is invented or faked.
+ */
+@Composable
+private fun FlameHeroCard(state: TrackerUiState) {
+    val stats = state.stats
+    SectionCard(container = Color(0xFF141414)) {
+        SectionLabel(stringResource(R.string.tracker_flame_title))
+        Spacer(Modifier.height(8.dp))
+
+        val headline = when {
+            stats.streakFrozen -> stringResource(R.string.tracker_flame_frozen, stats.frozenStreak)
+            stats.currentStreak > 0 -> stringResource(R.string.tracker_flame_burning, stats.currentStreak)
+            state.todayStatus == TrackerStatus.NO -> stringResource(R.string.tracker_flame_saved_today)
+            else -> stringResource(R.string.tracker_flame_waiting)
+        }
+        Text(
+            text = headline,
+            style = typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = SciFiColors.SolarAmber,
+        )
+
+        val subline = when {
+            stats.streakFrozen -> stringResource(R.string.tracker_flame_frozen_hint)
+            stats.currentStreak == 0 && stats.longestStreak == 0 ->
+                stringResource(R.string.tracker_flame_waiting_hint)
+            else -> stats.trackingStartDay?.let {
+                stringResource(R.string.tracker_flame_since, friendlyDate(it))
+            }
+        }
+        if (subline != null) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = subline,
+                style = typography.bodySmall,
+                color = colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            HeroStat(
+                value = if (stats.streakFrozen) stats.frozenStreak else stats.currentStreak,
+                label = stringResource(R.string.tracker_stat_current_streak),
+                accent = SciFiColors.NeonCyan,
+                modifier = Modifier.weight(1f),
+            )
+            HeroStat(
+                value = stats.longestStreak,
+                label = stringResource(R.string.tracker_stat_longest_streak),
+                accent = SciFiColors.SolarAmber,
+                modifier = Modifier.weight(1f),
+            )
+            HeroStat(
+                value = stats.noDays,
+                label = stringResource(R.string.tracker_stat_no_days),
+                accent = SciFiColors.GoGreen,
+                modifier = Modifier.weight(1f),
+            )
+            HeroStat(
+                value = stats.yesDays,
+                label = stringResource(R.string.tracker_stat_yes_days),
+                accent = colorScheme.error,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RowScope.HeroStat(
+    value: Int,
+    label: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = value.toString(),
+            style = typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = accent,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = label,
+            style = typography.labelSmall,
+            color = colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -516,11 +619,14 @@ private fun RecentHistoryCard(
     }
 }
 
-/** E. Settings — reminder, privacy disclosure and export. */
+/** E. Settings — privacy disclosure, export and the full fresh-start reset. */
 @Composable
 private fun SettingsCard(
     onExportCsv: () -> Unit,
+    onResetAll: () -> Unit,
 ) {
+    var pendingReset by remember { mutableStateOf(false) }
+
     SectionCard(container = Color(0xFF141414)) {
         SectionLabel(stringResource(R.string.tracker_privacy_title))
         Spacer(Modifier.height(6.dp))
@@ -547,6 +653,49 @@ private fun SettingsCard(
             text = stringResource(R.string.tracker_export_hint),
             style = typography.bodySmall,
             color = colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(Modifier.height(20.dp))
+        SectionLabel(stringResource(R.string.tracker_reset_title))
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = stringResource(R.string.tracker_reset_body),
+            style = typography.bodySmall,
+            color = colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = { pendingReset = true },
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = AppUI.CardRadius,
+            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                contentColor = colorScheme.error,
+            ),
+        ) {
+            Text(
+                text = stringResource(R.string.tracker_reset_button),
+                style = typography.titleSmall,
+                color = colorScheme.error,
+            )
+        }
+    }
+
+    if (pendingReset) {
+        AlertDialog(
+            onDismissRequest = { pendingReset = false },
+            title = { Text(stringResource(R.string.tracker_reset_title)) },
+            text = { Text(stringResource(R.string.tracker_reset_confirm_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingReset = false
+                    onResetAll()
+                }) { Text(stringResource(R.string.tracker_reset_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingReset = false }) {
+                    Text(stringResource(R.string.tracker_cancel))
+                }
+            },
         )
     }
 }
